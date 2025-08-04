@@ -1,0 +1,105 @@
+{
+  "app": {
+    "name": "Kite Clone",
+    "theme": "light",
+    "layout": {
+      "type": "column",
+      "children": [
+        {
+          "type": "header",
+          "props": {
+            "title": "Welcome, Atul",
+            "icon": "account_circle",
+            "backgroundColor": "#1e1e2f"
+          }
+        },
+        {
+          "type": "card",
+          "props": {
+            "title": "Market Watch",
+            "backgroundColor": "#ffffff",
+            "items": [
+              {
+                "symbol": "NIFTY 50",
+                "price": "22,450.75",
+                "change": "+0.75%",
+                "isPositive": true
+              },
+              {
+                "symbol": "BANKNIFTY",
+                "price": "48,300.25",
+                "change": "-0.42%",
+                "isPositive": false
+              },
+              {
+                "symbol": "RELIANCE",
+                "price": "2,475.80",
+                "change": "+1.10%",
+                "isPositive": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "row",
+          "props": {
+            "alignment": "center",
+            "children": [
+              {
+                "type": "button",
+                "props": {
+                  "text": "Buy",
+                  "color": "green",
+                  "icon": "arrow_upward"
+                }
+              },
+              {
+                "type": "button",
+                "props": {
+                  "text": "Sell",
+                  "color": "red",
+                  "icon": "arrow_downward"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "card",
+          "props": {
+            "title": "Holdings",
+            "backgroundColor": "#f9f9f9",
+            "items": [
+              {
+                "symbol": "ITC",
+                "quantity": 50,
+                "avg_price": "390.00",
+                "current_price": "420.10",
+                "pnl": "+1505"
+              },
+              {
+                "symbol": "TCS",
+                "quantity": 10,
+                "avg_price": "3650.00",
+                "current_price": "3620.50",
+                "pnl": "-295"
+              }
+            ]
+          }
+        },
+        {
+          "type": "bottom_nav",
+          "props": {
+            "items": [
+              { "icon": "home", "label": "Dashboard" },
+              { "icon": "assessment", "label": "Holdings" },
+              { "icon": "swap_vert", "label": "Orders" },
+              { "icon": "account_balance_wallet", "label": "Funds" },
+              { "icon": "settings", "label": "Settings" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
