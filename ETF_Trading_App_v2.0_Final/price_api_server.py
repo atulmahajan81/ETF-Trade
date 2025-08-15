@@ -20,6 +20,13 @@ CORS(app)  # Enable CORS for React app
 fetcher = MStocksPriceFetcher()
 dma_calculator = DMACalculator()
 
+# Try to restore existing session on startup
+print("🚀 Starting Flask API Server...")
+if fetcher.restore_session():
+    print("✅ Session restored successfully")
+else:
+    print("ℹ️ No valid session found, ready for login")
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint with session status"""
@@ -119,27 +126,54 @@ def login():
 
 @app.route('/api/session', methods=['POST'])
 def generate_session():
-    """Generate session endpoint"""
+    """Generate session with API key and OTP"""
     try:
         data = request.get_json()
-        api_key = data.get('api_key')
-        request_token = data.get('request_token')
-        otp = data.get('otp')
         
-        if not api_key or not otp:
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+        
+        api_key = data.get('api_key')
+        request_token = data.get('request_token')  # This should be the UGID from login
+        otp = data.get('otp')  # This should be the actual OTP
+        
+        if not api_key or not request_token or not otp:
             return jsonify({
-                'status': 'error',
-                'message': 'API key and OTP are required'
+                'status': 'error', 
+                'message': 'API key, request_token (UGID), and OTP are required'
             }), 400
         
-        # Pass OTP as request_token (as per working script)
-        result = fetcher.generate_session(api_key, otp, None)
-        return jsonify(result)
+        print(f"🔐 Generating session with:")
+        print(f"  API Key: {api_key[:20]}...")
+        print(f"  Request Token (UGID): {request_token[:20]}...")
+        print(f"  OTP: {otp}")
         
+        # Store API key in fetcher instance
+        fetcher.api_key = api_key
+        
+        # According to official docs: request_token parameter should contain the OTP
+        result = fetcher.generate_session(api_key, otp, None)
+        
+        if result:
+            return jsonify({
+                'status': 'success',
+                'message': 'Session generated successfully',
+                'data': {
+                    'access_token': fetcher.access_token[:20] + '...' if fetcher.access_token else None,
+                    'session_valid': True
+                }
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Session generation failed'
+            }), 500
+            
     except Exception as e:
+        print(f"❌ Session generation error: {str(e)}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': f'Session generation failed: {str(e)}'
         }), 500
 
 @app.route('/api/price/<symbol>', methods=['GET'])
@@ -286,6 +320,153 @@ def get_multiple_dma20():
         return jsonify({
             'status': 'error',
             'message': str(e)
+        }), 500
+
+@app.route('/api/order/buy', methods=['POST'])
+def place_buy_order():
+    """Place a buy order via MStocks API"""
+    try:
+        if not fetcher.access_token:
+            return jsonify({
+                'status': 'error',
+                'message': 'Not logged in. Please login first.'
+            }), 401
+        
+        data = request.get_json()
+        print(f"📋 Buy order request: {data}")
+        
+        # Extract order parameters
+        symbol = data.get('symbol', '').replace('NSE:', '').replace('BSE:', '')
+        quantity = data.get('quantity', 0)
+        order_type = data.get('order_type', 'MARKET')
+        product = data.get('product', 'CNC')
+        validity = data.get('validity', 'DAY')
+        price = data.get('price', 0)
+        trigger_price = data.get('trigger_price', 0)
+        
+        # Place order using MStocks API
+        result = fetcher.place_order(
+            tradingsymbol=symbol,
+            exchange='NSE',
+            transaction_type='BUY',
+            order_type=order_type,
+            quantity=str(quantity),
+            product=product,
+            validity=validity,
+            price=str(price),
+            trigger_price=str(trigger_price)
+        )
+        
+        print(f"✅ Buy order result: {result}")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Buy order error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Buy order failed: {str(e)}'
+        }), 500
+
+@app.route('/api/order/sell', methods=['POST'])
+def place_sell_order():
+    """Place a sell order via MStocks API"""
+    try:
+        if not fetcher.access_token:
+            return jsonify({
+                'status': 'error',
+                'message': 'Not logged in. Please login first.'
+            }), 401
+        
+        data = request.get_json()
+        print(f"📋 Sell order request: {data}")
+        
+        # Extract order parameters
+        symbol = data.get('symbol', '').replace('NSE:', '').replace('BSE:', '')
+        quantity = data.get('quantity', 0)
+        order_type = data.get('order_type', 'MARKET')
+        product = data.get('product', 'CNC')
+        validity = data.get('validity', 'DAY')
+        price = data.get('price', 0)
+        trigger_price = data.get('trigger_price', 0)
+        
+        # Place order using MStocks API
+        result = fetcher.place_order(
+            tradingsymbol=symbol,
+            exchange='NSE',
+            transaction_type='SELL',
+            order_type=order_type,
+            quantity=str(quantity),
+            product=product,
+            validity=validity,
+            price=str(price),
+            trigger_price=str(trigger_price)
+        )
+        
+        print(f"✅ Sell order result: {result}")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Sell order error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Sell order failed: {str(e)}'
+        }), 500
+
+@app.route('/api/orders', methods=['GET'])
+def get_orders():
+    """Get today's orders"""
+    try:
+        if not fetcher.access_token:
+            return jsonify({
+                'status': 'error',
+                'message': 'Not logged in. Please login first.'
+            }), 401
+        
+        result = fetcher.get_order_book()
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to get orders: {str(e)}'
+        }), 500
+
+@app.route('/api/order/status/<order_id>', methods=['GET'])
+def get_order_status(order_id):
+    """Get order status by order ID"""
+    try:
+        if not fetcher.access_token:
+            return jsonify({
+                'status': 'error',
+                'message': 'Not logged in. Please login first.'
+            }), 401
+        
+        result = fetcher.get_order_details(order_id, 'NSE')
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to get order status: {str(e)}'
+        }), 500
+
+@app.route('/api/order/cancel/<order_id>', methods=['DELETE'])
+def cancel_order(order_id):
+    """Cancel an order by order ID"""
+    try:
+        if not fetcher.access_token:
+            return jsonify({
+                'status': 'error',
+                'message': 'Not logged in. Please login first.'
+            }), 401
+        
+        result = fetcher.cancel_order(order_id)
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to cancel order: {str(e)}'
         }), 500
 
 if __name__ == '__main__':

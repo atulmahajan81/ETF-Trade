@@ -31,6 +31,75 @@ const MStocksLogin = ({ onLoginSuccess, onLoginError }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionTestResult, setConnectionTestResult] = useState(null);
+
+  // Test network connectivity to MStocks API
+  const testConnection = async () => {
+    setIsTestingConnection(true);
+    setConnectionTestResult(null);
+    
+    try {
+      console.log('🔍 Testing network connectivity to MStocks API...');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      try {
+        const response = await fetch('https://api.mstock.trade/openapi/typea/connect/login', {
+          method: 'OPTIONS', // Use OPTIONS to test connectivity without actual login
+          headers: {
+            'X-Mirae-Version': '1',
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        setConnectionTestResult({
+          success: true,
+          message: '✅ Network connectivity test successful! MStocks API is reachable.',
+          status: response.status,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+        
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          setConnectionTestResult({
+            success: false,
+            message: '❌ Connection timeout: MStocks API is not responding within 10 seconds.',
+            error: 'TIMEOUT'
+          });
+        } else if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
+          setConnectionTestResult({
+            success: false,
+            message: '❌ Network error: Cannot reach MStocks API. Check your internet connection.',
+            error: 'NETWORK_ERROR',
+            details: fetchError.message
+          });
+        } else {
+          setConnectionTestResult({
+            success: false,
+            message: `❌ Connection test failed: ${fetchError.message}`,
+            error: 'UNKNOWN_ERROR',
+            details: fetchError.message
+          });
+        }
+      }
+      
+    } catch (error) {
+      setConnectionTestResult({
+        success: false,
+        message: `❌ Connection test error: ${error.message}`,
+        error: 'TEST_ERROR',
+        details: error.message
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
 
   // Save credentials to localStorage
   const saveCredentials = (newCredentials) => {
@@ -92,71 +161,99 @@ const MStocksLogin = ({ onLoginSuccess, onLoginError }) => {
         body: formData.toString()
       });
 
-      const response = await fetch('https://api.mstock.trade/openapi/typea/connect/login', {
-        method: 'POST',
-        headers: {
-          'X-Mirae-Version': '1',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData
-      });
+      // Add timeout and retry logic
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      console.log('🔐 Login Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      if (!response.ok) {
-        let errorMessage = `Login failed: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (jsonError) {
-          // If response is not JSON, try to get text
-          try {
-            const errorText = await response.text();
-            errorMessage = errorText || errorMessage;
-          } catch (textError) {
-            // If all else fails, use status text
-            errorMessage = response.statusText || errorMessage;
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      let loginData;
       try {
-        loginData = await response.json();
-      } catch (jsonError) {
-        console.error('Failed to parse login response as JSON:', jsonError);
-        const responseText = await response.text();
-        console.log('Raw response:', responseText);
-        throw new Error('Invalid response format from MStocks API');
-      }
-      
-      if (loginData.status === 'success') {
-        // Store the UGID for session generation
-        setCredentials(prev => ({
-          ...prev,
-          ugid: loginData.data.ugid
-        }));
-        setStep(2);
-      } else {
-        throw new Error(loginData.message || 'Login failed');
+        const response = await fetch('https://api.mstock.trade/openapi/typea/connect/login', {
+          method: 'POST',
+          headers: {
+            'X-Mirae-Version': '1',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log('🔐 Login Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+
+        if (!response.ok) {
+          let errorMessage = `Login failed: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (jsonError) {
+            // If response is not JSON, try to get text
+            try {
+              const errorText = await response.text();
+              errorMessage = errorText || errorMessage;
+            } catch (textError) {
+              // If all else fails, use status text
+              errorMessage = response.statusText || errorMessage;
+            }
+          }
+          throw new Error(errorMessage);
+        }
+
+        let loginData;
+        try {
+          loginData = await response.json();
+        } catch (jsonError) {
+          console.error('Failed to parse login response as JSON:', jsonError);
+          const responseText = await response.text();
+          console.log('Raw response:', responseText);
+          throw new Error('Invalid response format from MStocks API');
+        }
+        
+        if (loginData.status === 'success') {
+          // Store the UGID for session generation
+          setCredentials(prev => ({
+            ...prev,
+            ugid: loginData.data.ugid
+          }));
+          setStep(2);
+        } else {
+          throw new Error(loginData.message || 'Login failed');
+        }
+        
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout: MStocks API took too long to respond. Please check your internet connection and try again.');
+        }
+        
+        throw fetchError;
       }
       
     } catch (err) {
       console.error('Login error:', err);
       
       if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
-        setError('Network error: Unable to connect to MStocks API. Please check your internet connection or try demo mode.');
+        setError(`Network error: Unable to connect to MStocks API. 
+        
+Possible causes:
+• Check your internet connection
+• MStocks API might be temporarily down
+• Firewall or antivirus blocking the connection
+• Try using demo mode instead
+
+Error details: ${err.message}`);
+      } else if (err.message.includes('timeout')) {
+        setError(err.message);
       } else {
         setError(err.message || 'Login failed. Please check your username and password.');
       }
       
       if (onLoginError) {
-        onLoginError(err);
+        onLoginError(err.message || 'Login failed');
       }
     } finally {
       setIsLoading(false);
@@ -195,28 +292,29 @@ const MStocksLogin = ({ onLoginSuccess, onLoginError }) => {
       }
 
       // Step 2: Generate session token using API key and request token (JSON format)
-      const payload = {
-        api_key: credentials.apiKey,
-        request_token: credentials.requestToken
-      };
+      // Use the correct endpoint and format from Python API
+      const formData = new URLSearchParams();
+      formData.append('api_key', credentials.apiKey);
+      formData.append('request_token', credentials.requestToken); // This should be the OTP
+      formData.append('checksum', 'L'); // Default checksum as per documentation
 
       console.log('🔐 Session Request:', {
-        url: 'https://api.mstock.trade/openapi/typea/connect/session',
+        url: 'https://api.mstock.trade/openapi/typea/session/token',
         method: 'POST',
         headers: {
           'X-Mirae-Version': '1',
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify(payload)
+        body: formData.toString()
       });
 
-      const response = await fetch('https://api.mstock.trade/openapi/typea/connect/session', {
+      const response = await fetch('https://api.mstock.trade/openapi/typea/session/token', {
         method: 'POST',
         headers: {
           'X-Mirae-Version': '1',
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify(payload)
+        body: formData
       });
 
       console.log('🔐 Session Response:', {
@@ -261,12 +359,14 @@ const MStocksLogin = ({ onLoginSuccess, onLoginError }) => {
           credentials.requestToken
         );
         
-        // Store session details in service
+        // Store session details in service and persist for refresh
         mstocksApiService.apiKey = credentials.apiKey;
         mstocksApiService.accessToken = sessionData.data.access_token;
         mstocksApiService.enctoken = sessionData.data.enctoken;
         mstocksApiService.refreshToken = sessionData.data.refresh_token;
+        mstocksApiService.username = credentials.username;
         mstocksApiService.tokenExpiry = new Date(Date.now() + (2 * 60 * 60 * 1000)); // 2 hours
+        try { mstocksApiService.saveSession(); } catch {}
         
         if (onLoginSuccess) {
           onLoginSuccess({
@@ -288,7 +388,7 @@ const MStocksLogin = ({ onLoginSuccess, onLoginError }) => {
       }
       
       if (onLoginError) {
-        onLoginError(err);
+        onLoginError(err.message || 'Session generation failed');
       }
     } finally {
       setIsLoading(false);
@@ -377,6 +477,38 @@ const MStocksLogin = ({ onLoginSuccess, onLoginError }) => {
           </button>
         </div>
       </div>
+
+      {/* Network Connection Test */}
+      {!isDemoMode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm text-blue-800 font-medium">Network Test</p>
+              <p className="text-xs text-blue-700">Test connectivity to MStocks API</p>
+            </div>
+            <button
+              onClick={testConnection}
+              disabled={isTestingConnection}
+              className="px-3 py-1 rounded-md text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition duration-200"
+            >
+              {isTestingConnection ? 'Testing...' : 'Test Connection'}
+            </button>
+          </div>
+          
+          {connectionTestResult && (
+            <div className={`mt-2 p-2 rounded text-xs ${
+              connectionTestResult.success 
+                ? 'bg-green-100 text-green-800 border border-green-200' 
+                : 'bg-red-100 text-red-800 border border-red-200'
+            }`}>
+              <p className="font-medium">{connectionTestResult.message}</p>
+              {connectionTestResult.details && (
+                <p className="mt-1 text-xs opacity-75">{connectionTestResult.details}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Clear Saved Credentials */}
       {(credentials.username || credentials.password || credentials.apiKey) && (

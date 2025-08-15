@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import mstocksApiService from '../services/mstocksApi';
 import shoonyaApiService from '../services/shoonyaApi';
-import pythonPriceApiService from '../services/pythonPriceApi';
 
 const MultiBrokerLogin = ({ onLoginSuccess, onLoginError }) => {
   const [selectedBroker, setSelectedBroker] = useState('mstocks');
@@ -128,19 +127,19 @@ const MultiBrokerLogin = ({ onLoginSuccess, onLoginError }) => {
       }
 
       if (selectedBroker === 'mstocks') {
-        // MStocks Step 1: Login with username and password via Python API
-        console.log('🔐 Logging in via Python API...');
+        // MStocks Step 1: Login with username and password via direct API
+        console.log('🔐 Logging in via direct MStocks API...');
         
-        const loginResult = await pythonPriceApiService.login(
+        const loginResult = await mstocksApiService.login(
           mstocksCredentials.username,
           mstocksCredentials.password
         );
         
         if (loginResult.status === 'success') {
-          console.log('✅ Python API login successful');
+          console.log('✅ MStocks API login successful');
           setMstocksCredentials(prev => ({
             ...prev,
-            requestToken: loginResult.data?.request_token || ''
+            requestToken: loginResult.data?.request_token || loginResult.data?.ugid || ''
           }));
           setStep(2);
         } else {
@@ -171,7 +170,7 @@ const MultiBrokerLogin = ({ onLoginSuccess, onLoginError }) => {
       console.error('Login error:', err);
       setError(err.message || 'Login failed. Please check your credentials.');
       if (onLoginError) {
-        onLoginError(err);
+        onLoginError(err.message || 'Login failed');
       }
     } finally {
       setIsLoading(false);
@@ -207,16 +206,16 @@ const MultiBrokerLogin = ({ onLoginSuccess, onLoginError }) => {
         return;
       }
 
-      // MStocks Step 2: Generate session token via Python API
-      console.log('🔐 Generating session via Python API...');
-      
-      const sessionResult = await pythonPriceApiService.generateSession(
-        mstocksCredentials.apiKey,
-        mstocksCredentials.requestToken
-      );
+             // MStocks Step 2: Generate session token via direct API
+       console.log('🔐 Generating session via direct MStocks API...');
+       
+       const sessionResult = await mstocksApiService.generateSession(
+         mstocksCredentials.apiKey,
+         mstocksCredentials.requestToken
+       );
       
       if (sessionResult.status === 'success') {
-        console.log('✅ Python API session generation successful');
+                 console.log('✅ MStocks API session generation successful');
         
         // Also set credentials in browser API for fallback
         mstocksApiService.setCredentials(
@@ -237,7 +236,7 @@ const MultiBrokerLogin = ({ onLoginSuccess, onLoginError }) => {
             apiKey: mstocksCredentials.apiKey,
             accessToken: sessionResult.data?.access_token,
             userData: sessionResult.data,
-            pythonApi: true
+                         directApi: true
           });
         }
       } else {
@@ -247,7 +246,7 @@ const MultiBrokerLogin = ({ onLoginSuccess, onLoginError }) => {
       console.error('Session generation error:', err);
       setError(err.message || 'Session generation failed. Please check your API key and request token.');
       if (onLoginError) {
-        onLoginError(err);
+        onLoginError(err.message || 'Session generation failed');
       }
     } finally {
       setIsLoading(false);
@@ -255,14 +254,14 @@ const MultiBrokerLogin = ({ onLoginSuccess, onLoginError }) => {
   };
 
   const handleLogout = async () => {
-    if (selectedBroker === 'mstocks') {
-      // Logout from Python API
-      try {
-        await pythonPriceApiService.logout();
-        console.log('✅ Logged out from Python API');
-      } catch (error) {
-        console.warn('⚠️ Python API logout failed:', error);
-      }
+         if (selectedBroker === 'mstocks') {
+       // Logout from MStocks API
+       try {
+         mstocksApiService.logout();
+         console.log('✅ Logged out from MStocks API');
+       } catch (error) {
+         console.warn('⚠️ MStocks API logout failed:', error);
+       }
       
       // Also logout from browser API
       mstocksApiService.logout();

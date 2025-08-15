@@ -1,0 +1,3 @@
+buyDate,symbol,underlyingAsset,buyPrice,actualBuyQty,investedAmount,sellPrice,sellDate
+2024-01-10,NSE:ITBEES,NIFTY IT ETF,38.60,100,3860,42.50,2024-01-30
+2024-01-12,NSE:PHARMABEES,NIFTY Pharma ETF,17.10,150,2565,18.20,2024-01-28 

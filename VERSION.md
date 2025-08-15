@@ -1,6 +1,14 @@
 # Version History
 
-## Version 1.1.0 - Trading Integration Release (Current)
+## Version 2.0.0 - FINAL (Current)
+
+Release Date: August 2025
+
+- See `VERSION_2.0_FINAL.md` for full notes
+
+---
+
+## Version 1.1.0 - Trading Integration Release
 
 **Release Date**: December 2024
 

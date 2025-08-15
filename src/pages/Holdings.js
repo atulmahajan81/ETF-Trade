@@ -13,13 +13,14 @@ import {
   Edit,
   Loader,
   Search,
-  Trash2
+  Trash2,
+  BarChart3,
+  Plus,
+  Minus
 } from 'lucide-react';
 import EditHoldingModal from '../components/EditHoldingModal';
 import mstocksApiService from '../services/mstocksApi';
-import shoonyaApiService from '../services/shoonyaApi';
-import googleFinanceApiService from '../services/googleFinanceApi';
-import pythonPriceApiService from '../services/pythonPriceApi';
+// Removed unused alternate APIs to ensure single source of truth
 
 // Virtualized row component for better performance
 const VirtualizedHoldingRow = React.memo(({ index, style, data }) => {
@@ -29,11 +30,13 @@ const VirtualizedHoldingRow = React.memo(({ index, style, data }) => {
   if (!holding) return null;
 
   const calculateProfit = (holding) => {
-    return (holding.quantity * holding.currentPrice) - (holding.quantity * holding.avgPrice);
+    const avg = Number(holding.avgPrice ?? holding.buyPrice ?? 0);
+    return (holding.quantity * holding.currentPrice) - (holding.quantity * avg);
   };
 
   const calculateProfitPercentage = (holding) => {
-    const totalInvested = holding.quantity * holding.avgPrice;
+    const avg = Number(holding.avgPrice ?? holding.buyPrice ?? 0);
+    const totalInvested = holding.quantity * avg;
     return totalInvested > 0 ? ((holding.quantity * holding.currentPrice) - totalInvested) / totalInvested * 100 : 0;
   };
 
@@ -41,67 +44,80 @@ const VirtualizedHoldingRow = React.memo(({ index, style, data }) => {
   const profitPercentage = calculateProfitPercentage(holding);
 
   return (
-    <div style={style} className="grid grid-cols-10 gap-4 px-6 py-4 border-b border-gray-200 hover:bg-gray-50 items-center">
-      <div className="text-sm font-medium text-gray-900">
+    <div style={style} className="grid holdings-grid gap-4 px-6 py-3 border-b border-upstox-primary hover:bg-upstox-tertiary items-center transition-colors duration-200">
+      <div className="text-sm font-medium text-upstox-primary">
         {holding.symbol}
       </div>
-      <div className="text-sm text-gray-900">
+      <div className="text-sm text-upstox-secondary">
         {holding.name}
       </div>
-      <div className="text-sm text-gray-900">
+      <div className="text-sm text-upstox-secondary">
         {holding.sector}
       </div>
-      <div className="text-sm text-gray-900">
+      <div className="text-sm text-upstox-secondary">
         {holding.buyDate || 'N/A'}
       </div>
-      <div className="text-sm text-gray-900">
+      <div className="text-sm font-medium text-upstox-primary">
         {holding.quantity}
       </div>
-      <div className="text-sm text-gray-900">
-        ₹{holding.avgPrice?.toFixed(2)}
+      <div className="text-sm font-medium text-upstox-primary">
+        ₹{(Number(holding.buyPrice) > 0 ? holding.buyPrice : holding.avgPrice)?.toFixed(2)}
       </div>
-      <div className="text-sm text-gray-900">
+      <div className="text-sm font-medium text-upstox-primary">
         ₹{holding.currentPrice?.toFixed(2)}
       </div>
-      <div className="text-sm font-medium">
-        <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+      <div className="text-sm font-semibold">
+        <span className={profit >= 0 ? 'text-positive' : 'text-negative'}>
           ₹{profit?.toFixed(2)}
         </span>
       </div>
-      <div className="text-sm font-medium">
-        <span className={profitPercentage >= 0 ? 'text-green-600' : 'text-red-600'}>
+      <div className="text-sm font-semibold">
+        <span className={profitPercentage >= 0 ? 'text-positive' : 'text-negative'}>
           {profitPercentage?.toFixed(2) || '0.00'}%
         </span>
       </div>
+      <div className="text-xs">
+        {holding.chunkId ? (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-upstox-tertiary text-upstox-primary border border-upstox-primary">
+            {holding.chunkInfo?.displayName || `#${holding.chunkId}`}
+            {holding.chunkInfo?.compoundLevel > 0 && (
+              <span className="ml-1 bg-positive text-white px-1 rounded">L{holding.chunkInfo.compoundLevel}</span>
+            )}
+            {holding.chunkInfo?.reconciled && <span className="ml-1">📋</span>}
+          </span>
+        ) : (
+          <span className="text-upstox-secondary">-</span>
+        )}
+      </div>
       <div className="text-sm font-medium">
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <button
             onClick={() => onEditHolding(holding, 'view')}
-            className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+            className="p-1.5 text-upstox-secondary hover:text-upstox-primary hover:bg-upstox-tertiary rounded-md transition-colors"
             title="View Details"
           >
-            <Eye size={12} />
+            <Eye size={14} />
           </button>
           <button
             onClick={() => onEditHolding(holding, 'edit')}
-            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            className="p-1.5 text-accent-blue hover:text-accent-blue-hover hover:bg-upstox-tertiary rounded-md transition-colors"
             title="Edit"
           >
-            <Edit size={12} />
+            <Edit size={14} />
           </button>
           <button
             onClick={() => onSell(holding)}
-            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            className="px-2 py-1 text-xs bg-negative text-white rounded-md hover:bg-negative-hover transition-colors font-medium"
             title="Sell"
           >
             Sell
           </button>
           <button
             onClick={() => onDelete(holding)}
-            className="px-2 py-1 text-xs bg-red-800 text-white rounded hover:bg-red-900 transition-colors"
+            className="p-1.5 text-negative hover:text-negative-hover hover:bg-upstox-tertiary rounded-md transition-colors"
             title="Delete"
           >
-            <Trash2 size={12} />
+            <Trash2 size={14} />
           </button>
         </div>
       </div>
@@ -206,7 +222,8 @@ const Holdings = () => {
   const { 
     dispatch,
     holdings: contextHoldings,
-    actionTypes
+    actionTypes,
+    saveCriticalData
   } = useETFTrading();
 
   const [holdings, setHoldings] = useState([]);
@@ -286,11 +303,9 @@ const Holdings = () => {
   const filteredHoldings = useOptimizedHoldingFiltering(currentHoldings, debouncedSearchTerm, sortBy, sortOrder);
   const analytics = useOptimizedHoldingAnalytics(currentHoldings);
 
-  // Function to fetch live prices for holdings using Python API
+  // Function to fetch live prices for holdings using MStocks API
   const refreshLivePrices = useCallback(async () => {
-    console.log('🔄 Refresh prices button clicked');
-    console.log('🐍 Using Python API Server for reliable price fetching');
-    console.log('🐍 No CORS restrictions, direct MStocks API access');
+    console.log('🔄 Refresh prices');
     
     if (currentHoldings.length === 0) {
       console.log('No holdings to refresh prices for');
@@ -305,22 +320,9 @@ const Holdings = () => {
       let errorCount = 0;
       let dataSource = '';
       
-      // Check Python API server status first
-      console.log(`🔍 Checking Python API server status...`);
-      let pythonApiAvailable = false;
-      try {
-        const pythonApiStatus = await pythonPriceApiService.testConnection();
-        console.log(`🔍 Python API Status:`, pythonApiStatus);
-        pythonApiAvailable = pythonApiStatus.status === 'success';
-      } catch (error) {
-        console.warn(`⚠️ Python API server not available:`, error.message);
-      }
-      
-      // Check if any browser-based broker is connected (fallback)
+      // Check MStocks connection
       const isMStocksConnected = mstocksApiService.isLoggedIn();
-      const isShoonyaConnected = shoonyaApiService.isLoggedIn();
-      
-      console.log(`🔍 API Status - Python: ${pythonApiAvailable}, MStocks: ${isMStocksConnected}, Shoonya: ${isShoonyaConnected}`);
+      console.log(`🔍 MStocks connected: ${isMStocksConnected}`);
       
       // Process each holding to fetch live price
       for (let i = 0; i < updatedHoldings.length; i++) {
@@ -331,57 +333,26 @@ const Holdings = () => {
           const cleanSymbol = holding.symbol.replace('NSE:', '').replace('BSE:', '');
           
           let newPrice = null;
-          
-          // Try Python API first (most reliable)
-          if (pythonApiAvailable) {
+          if (isMStocksConnected) {
             try {
-              console.log(`📈 Fetching price for ${cleanSymbol} from Python API...`);
-              const priceData = await pythonPriceApiService.getLivePrice(holding.symbol);
-              console.log(`📊 Python API response for ${cleanSymbol}:`, priceData);
-              
-              if (priceData && priceData.lastPrice && parseFloat(priceData.lastPrice) > 0) {
-                newPrice = parseFloat(priceData.lastPrice);
-                dataSource = priceData.source || 'Python MStocks API';
-                console.log(`✅ Python API price for ${cleanSymbol}: ₹${newPrice}`);
-              } else {
-                console.warn(`⚠️ Python API returned no valid price for ${cleanSymbol}:`, priceData);
-              }
-            } catch (pythonError) {
-              console.warn(`⚠️ Python API failed for ${cleanSymbol}:`, pythonError.message);
-            }
-          } else {
-            console.log(`ℹ️ Python API not available, trying browser-based APIs...`);
-          }
-          
-          // Fallback to browser-based APIs if Python API fails or not available
-          if (!newPrice && isMStocksConnected) {
-            try {
-              console.log(`📈 Fetching price for ${cleanSymbol} from browser MStocks API...`);
+              console.log(`📈 Fetching price for ${cleanSymbol} from MStocks API...`);
               const priceData = await mstocksApiService.getLivePrice(holding.symbol);
-              if (priceData && priceData.lastPrice && parseFloat(priceData.lastPrice) > 0) {
-                newPrice = parseFloat(priceData.lastPrice);
-                dataSource = 'Browser MStocks API';
-                console.log(`✅ Browser MStocks price for ${cleanSymbol}: ₹${newPrice}`);
+              const ltp = Number(
+                priceData?.data?.price ??
+                priceData?.lastPrice ??
+                priceData?.price ??
+                priceData?.data?.ltp ??
+                0
+              );
+              if (ltp > 0) {
+                newPrice = ltp;
+                dataSource = priceData?.data?.source || 'MStocks API';
+                console.log(`✅ MStocks price for ${cleanSymbol}: ₹${newPrice}`);
               } else {
                 console.warn(`⚠️ Browser MStocks API returned no valid price for ${cleanSymbol}:`, priceData);
               }
             } catch (mstocksError) {
               console.warn(`⚠️ Browser MStocks API failed for ${cleanSymbol}:`, mstocksError.message);
-            }
-          }
-          
-          // Try Shoonya API if both Python and MStocks failed
-          if (!newPrice && isShoonyaConnected) {
-            try {
-              console.log(`📈 Fetching price for ${cleanSymbol} from Shoonya API...`);
-              const priceData = await shoonyaApiService.getLivePrice(holding.symbol);
-              if (priceData && priceData.lastPrice && parseFloat(priceData.lastPrice) > 0) {
-                newPrice = parseFloat(priceData.lastPrice);
-                dataSource = 'Shoonya API';
-                console.log(`✅ Shoonya price for ${cleanSymbol}: ₹${newPrice}`);
-              }
-            } catch (shoonyaError) {
-              console.warn(`⚠️ Shoonya API failed for ${cleanSymbol}:`, shoonyaError.message);
             }
           }
           
@@ -431,15 +402,7 @@ const Holdings = () => {
       }
       
       const marketStatus = isMarketOpen() ? 'Live prices' : 'Latest available prices';
-      let apiStatus = 'No API';
-      if (pythonApiAvailable) {
-        apiStatus = 'Python MStocks API';
-      } else if (isMStocksConnected) {
-        apiStatus = 'Browser MStocks API';
-      } else if (isShoonyaConnected) {
-        apiStatus = 'Shoonya API';
-      }
-      const message = `${marketStatus} updated via ${apiStatus}! (${successCount} success, ${errorCount} failed)`;
+      const message = `${marketStatus} updated via MStocks API! (${successCount} success, ${errorCount} failed)`;
       setPriceUpdateMessage(message);
       setTimeout(() => setPriceUpdateMessage(''), 5000);
       
@@ -612,6 +575,10 @@ const Holdings = () => {
     onDelete: (holding) => {
       if (window.confirm(`Are you sure you want to delete ${holding.symbol}? This action cannot be undone.`)) {
         dispatch({ type: actionTypes.REMOVE_HOLDING, payload: holding.id });
+        // Immediate save after manual delete
+        if (saveCriticalData) {
+          setTimeout(() => saveCriticalData('manual holding delete'), 100);
+        }
         forceRefresh();
         alert(`Holding for ${holding.symbol} deleted.`);
       }
@@ -621,31 +588,36 @@ const Holdings = () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-upstox-primary text-upstox-primary flex items-center justify-center">
         <div className="text-center">
-          <Loader className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading holdings...</p>
+          <Loader className="animate-spin h-8 w-8 text-accent-blue mx-auto mb-4" />
+          <p className="text-upstox-secondary">Loading holdings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-upstox-primary text-upstox-primary">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Holdings</h1>
-            <p className="text-gray-600">Track your current ETF investments</p>
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-accent-blue to-accent-blue-light rounded-xl flex items-center justify-center">
+              <BarChart3 className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-upstox-primary">Holdings</h1>
+              <p className="text-upstox-secondary">Track your current ETF investments and performance</p>
+            </div>
           </div>
-          <div className="mt-4 md:mt-0 flex gap-3">
+          <div className="flex gap-3">
             <button
               onClick={refreshLivePrices}
               disabled={isRefreshingPrices}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="btn-upstox-primary flex items-center gap-2"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingPrices ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshingPrices ? 'animate-spin' : ''}`} />
               Refresh Prices
             </button>
           </div>
@@ -653,66 +625,74 @@ const Holdings = () => {
 
         {/* Price Update Message */}
         {priceUpdateMessage && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-6 p-4 card-upstox">
             <div className="flex items-center">
-              <AlertCircle className="w-4 h-4 mr-2 text-blue-600" />
-              <span className="text-sm font-medium text-blue-600">{priceUpdateMessage}</span>
+              <AlertCircle className="w-4 h-4 mr-2 text-upstox-primary" />
+              <span className="text-sm font-medium text-upstox-primary">{priceUpdateMessage}</span>
             </div>
           </div>
         )}
 
         {/* Analytics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <DollarSign className="h-6 w-6 text-blue-600" />
+          <div className="card-upstox">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-upstox-tertiary rounded-lg">
+                  <DollarSign className="h-6 w-6 text-accent-blue" />
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Invested</p>
-                <p className="text-2xl font-bold text-gray-900">₹{analytics.totalInvested.toFixed(2)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Package className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Current Value</p>
-                <p className="text-2xl font-bold text-gray-900">₹{analytics.totalCurrentValue.toFixed(2)}</p>
+              <div>
+                <p className="text-sm font-medium text-upstox-secondary mb-1">Total Invested</p>
+                <p className="text-2xl font-bold text-upstox-primary">₹{analytics.totalInvested.toFixed(2)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className={`p-2 rounded-lg ${analytics.totalProfit >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                {analytics.totalProfit >= 0 ? (
-                  <TrendingUp className="h-6 w-6 text-green-600" />
-                ) : (
-                  <TrendingDown className="h-6 w-6 text-red-600" />
-                )}
+          <div className="card-upstox">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-upstox-tertiary rounded-lg">
+                  <Package className="h-6 w-6 text-upstox-secondary" />
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total P&L</p>
-                <p className={`text-2xl font-bold ${analytics.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div>
+                <p className="text-sm font-medium text-upstox-secondary mb-1">Current Value</p>
+                <p className="text-2xl font-bold text-upstox-primary">₹{analytics.totalCurrentValue.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card-upstox">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-lg bg-upstox-tertiary">
+                  {analytics.totalProfit >= 0 ? (
+                    <TrendingUp className="h-6 w-6 text-positive" />
+                  ) : (
+                    <TrendingDown className="h-6 w-6 text-negative" />
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-upstox-secondary mb-1">Total P&L</p>
+                <p className={`text-2xl font-bold ${analytics.totalProfit >= 0 ? 'text-positive' : 'text-negative'}`}>
                   ₹{analytics.totalProfit.toFixed(2)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className={`p-2 rounded-lg ${analytics.totalProfitPercentage >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                <Calendar className={`h-6 w-6 ${analytics.totalProfitPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+          <div className="card-upstox">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-lg bg-upstox-tertiary">
+                  <Calendar className={`h-6 w-6 ${analytics.totalProfitPercentage >= 0 ? 'text-positive' : 'text-negative'}`} />
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">P&L %</p>
-                <p className={`text-2xl font-bold ${analytics.totalProfitPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div>
+                <p className="text-sm font-medium text-upstox-secondary mb-1">P&L %</p>
+                <p className={`text-2xl font-bold ${analytics.totalProfitPercentage >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {analytics.totalProfitPercentage.toFixed(2)}%
                 </p>
               </div>
@@ -721,239 +701,253 @@ const Holdings = () => {
         </div>
 
         {/* Search and Sort */}
-        <div className="bg-white rounded-lg shadow mb-8 p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div className="flex-1 max-w-md">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  placeholder="Search by symbol, name, or sector..."
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={handleClearSearch}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    ×
-                  </button>
-                )}
+        <div className="card-upstox mb-8">
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+              <div className="flex-1 max-w-md">
+                <label className="block text-sm font-medium text-upstox-primary mb-1">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-upstox-secondary h-4 w-4" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    placeholder="Search by symbol, name, or sector..."
+                    className="input-upstox pl-10 pr-10"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-upstox-secondary hover:text-upstox-primary"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Sort by:</span>
-              <select
-                value={`${sortBy}-${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split('-');
-                  handleSortChange(field, order);
-                }}
-                className="text-sm border border-gray-300 rounded px-2 py-1"
-              >
-                <option value="symbol-asc">Symbol (A-Z)</option>
-                <option value="symbol-desc">Symbol (Z-A)</option>
-                <option value="profit-desc">Profit (High to Low)</option>
-                <option value="profit-asc">Profit (Low to High)</option>
-                <option value="profitPercentage-desc">Profit % (High to Low)</option>
-                <option value="profitPercentage-asc">Profit % (Low to High)</option>
-                <option value="currentValue-desc">Current Value (High to Low)</option>
-                <option value="currentValue-asc">Current Value (Low to High)</option>
-              </select>
+              
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-upstox-secondary">Sort by:</span>
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [field, order] = e.target.value.split('-');
+                    handleSortChange(field, order);
+                  }}
+                  className="input-upstox text-sm"
+                >
+                  <option value="symbol-asc">Symbol (A-Z)</option>
+                  <option value="symbol-desc">Symbol (Z-A)</option>
+                  <option value="profit-desc">Profit (High to Low)</option>
+                  <option value="profit-asc">Profit (Low to High)</option>
+                  <option value="profitPercentage-desc">Profit % (High to Low)</option>
+                  <option value="profitPercentage-asc">Profit % (Low to High)</option>
+                  <option value="currentValue-desc">Current Value (High to Low)</option>
+                  <option value="currentValue-asc">Current Value (Low to High)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Add Holding Form */}
-        <div className="bg-white rounded-lg shadow mb-8 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Holding</h3>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const symbol = formData.get('symbol');
-            const name = formData.get('name');
-            const quantity = formData.get('quantity');
-            const buyPrice = formData.get('buyPrice');
-            const currentPrice = formData.get('currentPrice');
-            const sector = formData.get('sector') || 'General';
-            const buyDate = formData.get('buyDate') || new Date().toISOString().split('T')[0];
+        <div className="card-upstox mb-8">
+          <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+            <h3 className="text-lg font-semibold text-upstox-primary">Add New Holding</h3>
+          </div>
+          <div className="p-6">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const symbol = formData.get('symbol');
+              const name = formData.get('name');
+              const quantity = formData.get('quantity');
+              const buyPrice = formData.get('buyPrice');
+              const currentPrice = formData.get('currentPrice');
+              const sector = formData.get('sector') || 'General';
+              const buyDate = formData.get('buyDate') || new Date().toISOString().split('T')[0];
 
-            if (!symbol || !name || !quantity || !buyPrice || !currentPrice) {
-              alert('Please fill in all required fields');
-              return;
-            }
+              if (!symbol || !name || !quantity || !buyPrice || !currentPrice) {
+                alert('Please fill in all required fields');
+                return;
+              }
 
-            // Validate date
-            if (buyDate && new Date(buyDate) > new Date()) {
-              alert('Buy date cannot be in the future');
-              return;
-            }
+              // Validate date
+              if (buyDate && new Date(buyDate) > new Date()) {
+                alert('Buy date cannot be in the future');
+                return;
+              }
 
-            const totalInvested = parseFloat(buyPrice) * parseInt(quantity);
-            const currentValue = parseFloat(currentPrice) * parseInt(quantity);
-            const profitLoss = currentValue - totalInvested;
-            const profitPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
+              const totalInvested = parseFloat(buyPrice) * parseInt(quantity);
+              const currentValue = parseFloat(currentPrice) * parseInt(quantity);
+              const profitLoss = currentValue - totalInvested;
+              const profitPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
 
-            const newHolding = {
-              id: `holding_${Date.now()}`,
-              symbol: symbol.toUpperCase(),
-              name: name,
-              sector: sector,
-              buyDate: buyDate,
-              buyPrice: parseFloat(buyPrice),
-              quantity: parseInt(quantity),
-              currentPrice: parseFloat(currentPrice),
-              totalInvested: totalInvested,
-              currentValue: currentValue,
-              profitLoss: profitLoss,
-              profitPercentage: profitPercentage,
-              avgPrice: parseFloat(buyPrice),
-              lastBuyPrice: parseFloat(buyPrice),
-              lastBuyDate: buyDate,
-              notes: 'Added via form'
-            };
+              const newHolding = {
+                id: `holding_${Date.now()}`,
+                symbol: symbol.toUpperCase(),
+                name: name,
+                sector: sector,
+                buyDate: buyDate,
+                buyPrice: parseFloat(buyPrice),
+                quantity: parseInt(quantity),
+                currentPrice: parseFloat(currentPrice),
+                totalInvested: totalInvested,
+                currentValue: currentValue,
+                profitLoss: profitLoss,
+                profitPercentage: profitPercentage,
+                avgPrice: parseFloat(buyPrice),
+                lastBuyPrice: parseFloat(buyPrice),
+                lastBuyDate: buyDate,
+                notes: 'Added via form'
+              };
 
-            dispatch({ type: 'ADD_HOLDING', payload: newHolding });
-            e.target.reset();
-            alert('Holding added successfully!');
-          }}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Symbol *</label>
-                <input
-                  name="symbol"
-                  type="text"
-                  placeholder="e.g., NSE:MAHKTECH"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+              dispatch({ type: 'ADD_HOLDING', payload: newHolding });
+              // Immediate save after manual add
+              if (saveCriticalData) {
+                setTimeout(() => saveCriticalData('manual holding add'), 100);
+              }
+              e.target.reset();
+              alert('Holding added successfully!');
+            }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-upstox-primary mb-1">Symbol *</label>
+                  <input
+                    name="symbol"
+                    type="text"
+                    placeholder="e.g., NSE:MAHKTECH"
+                    className="input-upstox"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-upstox-primary mb-1">Name *</label>
+                  <input
+                    name="name"
+                    type="text"
+                    placeholder="ETF Name"
+                    className="input-upstox"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-upstox-primary mb-1">Quantity *</label>
+                  <input
+                    name="quantity"
+                    type="number"
+                    placeholder="100"
+                    min="1"
+                    className="input-upstox"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-upstox-primary mb-1">Buy Price (₹) *</label>
+                  <input
+                    name="buyPrice"
+                    type="number"
+                    placeholder="50.00"
+                    step="0.01"
+                    min="0"
+                    className="input-upstox"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-upstox-primary mb-1">Current Price (₹) *</label>
+                  <input
+                    name="currentPrice"
+                    type="number"
+                    placeholder="55.00"
+                    step="0.01"
+                    min="0"
+                    className="input-upstox"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-upstox-primary mb-1">Sector</label>
+                  <input
+                    name="sector"
+                    type="text"
+                    placeholder="Technology"
+                    className="input-upstox"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-upstox-primary mb-1">Buy Date</label>
+                  <input
+                    name="buyDate"
+                    type="date"
+                    defaultValue={new Date().toISOString().split('T')[0]}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="input-upstox"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="btn-upstox-primary w-full"
+                  >
+                    Add Holding
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                <input
-                  name="name"
-                  type="text"
-                  placeholder="ETF Name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
-                <input
-                  name="quantity"
-                  type="number"
-                  placeholder="100"
-                  min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Buy Price (₹) *</label>
-                <input
-                  name="buyPrice"
-                  type="number"
-                  placeholder="50.00"
-                  step="0.01"
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (₹) *</label>
-                <input
-                  name="currentPrice"
-                  type="number"
-                  placeholder="55.00"
-                  step="0.01"
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sector</label>
-                <input
-                  name="sector"
-                  type="text"
-                  placeholder="Technology"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Buy Date</label>
-                <input
-                  name="buyDate"
-                  type="date"
-                  defaultValue={new Date().toISOString().split('T')[0]}
-                  max={new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Add Holding
-                </button>
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
 
         {/* Results Summary */}
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-upstox-secondary">
             Showing {filteredHoldings.length} holdings
           </p>
         </div>
 
         {/* Virtualized Holdings Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {/* Table Header */}
-          <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-            <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <div>Symbol</div>
-              <div>Name</div>
-              <div>Sector</div>
-              <div>Buy Date</div>
-              <div>Quantity</div>
-              <div>Avg Price</div>
-              <div>Current Price</div>
-              <div>P&L</div>
-              <div>P&L %</div>
-              <div>Actions</div>
+        <div className="card-upstox overflow-x-auto">
+          <div style={{ minWidth: 1750 }}>
+            {/* Table Header */}
+            <div className="bg-upstox-tertiary px-6 py-3 border-b border-upstox-primary">
+              <div className="grid holdings-grid gap-4 text-xs font-medium text-upstox-secondary uppercase tracking-wider">
+                <div>Symbol</div>
+                <div>Name</div>
+                <div>Sector</div>
+                <div>Buy Date</div>
+                <div>Quantity</div>
+                <div>Buy Price</div>
+                <div>Current Price</div>
+                <div>P&L</div>
+                <div>P&L %</div>
+                <div>Chunk</div>
+                <div>Actions</div>
+              </div>
             </div>
-          </div>
 
-          {/* Virtualized List */}
-          {filteredHoldings.length > 0 ? (
-            <div style={{ height: '600px' }}>
-              <List
-                key={refreshKey} // Add key to force re-render
-                ref={listRef}
-                height={600}
-                itemCount={filteredHoldings.length}
-                itemSize={60}
-                itemData={virtualizedData}
-                overscanCount={5}
-              >
-                {VirtualizedHoldingRow}
-              </List>
-            </div>
-          ) : (
-            <div className="p-6 text-center text-gray-500">
-              No holdings found.
-            </div>
-          )}
+            {/* Virtualized List */}
+            {filteredHoldings.length > 0 ? (
+              <div style={{ height: '600px' }}>
+                <List
+                  key={refreshKey} // Add key to force re-render
+                  ref={listRef}
+                  height={600}
+                  width={1750}
+                  itemCount={filteredHoldings.length}
+                  itemSize={60}
+                  itemData={virtualizedData}
+                  overscanCount={5}
+                >
+                  {VirtualizedHoldingRow}
+                </List>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-upstox-secondary">
+                No holdings found.
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sell Modal */}
@@ -963,28 +957,28 @@ const Holdings = () => {
             onClick={closeSellModal}
           >
             <div 
-              className="bg-white rounded-lg p-6 w-full max-w-md"
+              className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-lg font-semibold mb-4">Sell {selectedHolding.symbol}</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Quantity</label>
                   <input
                     type="number"
                     value={sellQuantity}
                     onChange={(e) => setSellQuantity(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                     max={selectedHolding.quantity}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Price</label>
                   <input
                     type="number"
                     value={sellPrice}
                     onChange={(e) => setSellPrice(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input"
                     step="0.01"
                   />
                 </div>
@@ -992,13 +986,13 @@ const Holdings = () => {
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={confirmSell}
-                  className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors"
+                  className="btn btn-danger flex-1"
                 >
                   Confirm Sell
                 </button>
                 <button
                   onClick={closeSellModal}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors"
+                  className="btn btn-secondary flex-1"
                 >
                   Cancel
                 </button>

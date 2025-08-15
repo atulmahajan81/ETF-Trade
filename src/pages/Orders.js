@@ -23,9 +23,13 @@ const Orders = () => {
   const handleRefreshOrders = async () => {
     setIsRefreshing(true);
     try {
-      // Refresh status of all pending orders
-      for (const order of pendingOrders) {
-        await checkOrderStatus(order.orderId);
+      // If there are pendings, refresh each; otherwise, fetch broker order book and reconcile
+      if (pendingOrders && pendingOrders.length > 0) {
+        for (const order of pendingOrders) {
+          if (order.orderId) await checkOrderStatus(order.orderId);
+        }
+      } else {
+        await fetchOrderHistory();
       }
     } catch (error) {
       console.error('Error refreshing orders:', error);
@@ -103,18 +107,18 @@ const Orders = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-upstox-primary text-upstox-primary min-h-screen p-6 rounded-lg">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
-          <p className="text-gray-600">Track your pending orders and order history</p>
+          <h1 className="text-2xl font-bold text-upstox-primary">Orders</h1>
+          <p className="text-upstox-secondary">Track your pending orders and order history</p>
         </div>
         <div className="flex space-x-2">
           <button
             onClick={handleRefreshOrders}
             disabled={isRefreshing}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="btn-upstox-secondary disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh Orders
@@ -122,7 +126,7 @@ const Orders = () => {
           <button
             onClick={handleFetchOrderHistory}
             disabled={isFetchingHistory}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="btn-upstox-secondary disabled:opacity-50"
           >
             <Download className={`w-4 h-4 mr-2 ${isFetchingHistory ? 'animate-spin' : ''}`} />
             Fetch History
@@ -130,7 +134,7 @@ const Orders = () => {
           <button
             onClick={handleFetchBrokerHoldings}
             disabled={isFetchingHoldings}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="btn-upstox-secondary disabled:opacity-50"
           >
             <Download className={`w-4 h-4 mr-2 ${isFetchingHoldings ? 'animate-spin' : ''}`} />
             Fetch Holdings
@@ -140,34 +144,24 @@ const Orders = () => {
 
       {/* Trading Status Banner */}
       {tradingStatus !== 'idle' && (
-        <div className={`rounded-lg p-4 ${
-          tradingStatus === 'success' ? 'bg-green-50 border border-green-200' :
-          tradingStatus === 'error' ? 'bg-red-50 border border-red-200' :
-          tradingStatus === 'loading' ? 'bg-blue-50 border border-blue-200' :
-          'bg-gray-50 border border-gray-200'
-        }`}>
+        <div className="card-upstox p-4">
           <div className="flex items-center">
-            {tradingStatus === 'success' && <CheckCircle className="w-5 h-5 text-green-600 mr-2" />}
-            {tradingStatus === 'error' && <XCircle className="w-5 h-5 text-red-600 mr-2" />}
-            {tradingStatus === 'loading' && <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>}
+            {tradingStatus === 'success' && <CheckCircle className="w-5 h-5 text-positive mr-2" />}
+            {tradingStatus === 'error' && <XCircle className="w-5 h-5 text-negative mr-2" />}
+            {tradingStatus === 'loading' && <div className="w-5 h-5 border-2 border-accent-blue border-t-transparent rounded-full animate-spin mr-2"></div>}
             <div>
               <h3 className={`text-sm font-medium ${
-                tradingStatus === 'success' ? 'text-green-800' :
-                tradingStatus === 'error' ? 'text-red-800' :
-                tradingStatus === 'loading' ? 'text-blue-800' :
-                'text-gray-800'
+                tradingStatus === 'success' ? 'text-positive' :
+                tradingStatus === 'error' ? 'text-negative' :
+                tradingStatus === 'loading' ? 'text-upstox-primary' :
+                'text-upstox-secondary'
               }`}>
                 {tradingStatus === 'success' ? 'Order Placed Successfully' :
                  tradingStatus === 'error' ? 'Order Failed' :
                  tradingStatus === 'loading' ? 'Processing Order' :
                  'Trading Status'}
               </h3>
-              <p className={`text-sm ${
-                tradingStatus === 'success' ? 'text-green-700' :
-                tradingStatus === 'error' ? 'text-red-700' :
-                tradingStatus === 'loading' ? 'text-blue-700' :
-                'text-gray-700'
-              }`}>
+              <p className="text-sm text-upstox-secondary">
                 {typeof tradingMessage === 'string' ? tradingMessage : JSON.stringify(tradingMessage)}
               </p>
             </div>
@@ -193,14 +187,14 @@ const Orders = () => {
        </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-upstox-primary">
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('pending')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'pending'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-upstox-accent text-upstox-primary'
+                : 'border-transparent text-upstox-secondary hover:text-upstox-primary hover:border-upstox-primary'
             }`}
           >
             Pending Orders ({pendingOrders.length})
@@ -209,8 +203,8 @@ const Orders = () => {
             onClick={() => setActiveTab('history')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'history'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-upstox-accent text-upstox-primary'
+                : 'border-transparent text-upstox-secondary hover:text-upstox-primary hover:border-upstox-primary'
             }`}
           >
             Order History ({orderHistory.length})
@@ -220,8 +214,8 @@ const Orders = () => {
               onClick={() => setActiveTab('broker-holdings')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'broker-holdings'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-upstox-accent text-upstox-primary'
+                  : 'border-transparent text-upstox-secondary hover:text-upstox-primary hover:border-upstox-primary'
               }`}
             >
               Broker Holdings ({brokerHoldings.length})

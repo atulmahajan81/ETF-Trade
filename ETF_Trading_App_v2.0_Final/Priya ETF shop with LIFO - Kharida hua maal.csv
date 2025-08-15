@@ -1,0 +1,45 @@
+21 July 23,Total Capital + Profits Booked,,,,"Row 9 contains formulas, hence it's hidden. Do not delete that row",,,,,,,,,,,,,,,,,,,,,
+,"7,96,000",,,,,,,,,,,,Buy Date,ETF NSE Code,Underlying Asset,CMP,QTY,,ETF Code,LIFO gains,LIFO gains%,,,,,
+,Investment Capital,Investment per transaction (50 parts),Target,,Currently Invested,Current Value,Overall Notional P/L on all units,% Notional P/L,Total ETFs in holding,Remaining Cash,,New ETF Buy,01-Aug-25,NSE:MOM100,Nifty Midcap 100,60.89,262,LIFO Sell,,,,,,,,
+,"6,00,000","15,900",6%,,"5,89,488","5,63,773","-25,716",-4.36%,30,"2,06,512",,Existing ETF Buy,,,,,0,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,
+Today's Date ->,01-Aug-25,01/08/2025 15:30:01,,,,,,,,,,,,,,,,,,,,,,,,
+Manual Entry,,,,,This data will populate automatically,,,,,,,,,,,,,,,,,Summary of investment in various Underlying Assets ,,,,
+Buy Date,ETF Code,Underlying Asset,Buy Price,Actual Buy Qty,Suggested Qty,Invested amount,Total qty,Total Invested,Avg Price,CMP,,Last Buy Price,% Fallen from Last Buy Price,Overall Notional P/L on all units,Notional P/L%,Rank by % Fallen from Last Purchase price,Rank by Overall Notional profit%,LIFO gains,LIFO gains%,LIFO Target Price,,Underlying Asset,Invested amount,% of total investment,Notional Profit,Notional Profit%
+,,Underlying Asset,,,,,,,,,,,,,,,,,,,,Underlying Asset,0,0.00%,0,#DIV/0!
+06-Jun-24,NSE:PSUBANK,Nifty PSU Bank,721.00,20,,"14,420",20,"14,420",721.00,695.00,,721.00,-3.61%,-520,-3.61%,14,18,-520,-3.61%,764.26,,Nifty PSU Bank,"76,123",9.56%,"-4,894",-6.43%
+07-Jun-24,NSE:PSUBNKBEES,Nifty PSU Bank,80.50,180,,"14,490",180,"14,490",80.50,76.00,,80.50,-5.59%,-810,-5.59%,7,9,-810,-5.59%,85.33,,CPSE ETF,"35,975",4.52%,"-2,714",-7.55%
+21-Jun-24,NSE:PSUBNKIETF,Nifty PSU Bank,74.75,203,,"15,174",203,"15,174",,,,,,,,,,,,79.24,,Nifty Midcap 150,"14,850",1.87%,-473,-3.18%
+01-Jul-24,NSE:PSUBNKIETF,Nifty PSU Bank,74.50,213,,"15,869",416,"31,043",,,,,,,,,,,,78.97,,Nifty Pharma TRI,"19,188",2.41%,-674,-3.51%
+08-Jul-24,NSE:PSUBNKIETF,Nifty PSU Bank,73.50,220,,"16,170",636,"47,213",74.23,68.63,,73.50,-6.63%,"-3,564",-7.55%,4,3,"-1,071",-6.63%,77.91,,Nifty50 Value 20,"49,511",6.22%,"-2,733",-5.52%
+22-Aug-24,NSE:CPSEETF,CPSE ETF,102.46,170,,"17,418",170,"17,418",,,,,,,,,,,,108.61,,S&P BSE Midcap Select Index,"17,765",2.23%,"-1,511",-8.50%
+11-Dec-24,NSE:CPSEETF,CPSE ETF,92.32,201,,"18,556",371,"35,975",96.97,89.65,,92.32,-2.89%,"-2,714",-7.55%,19,4,-537,-2.89%,97.86,,Nifty FMCG Index,"30,769",3.87%,"-1,249",-4.06%
+02-Sep-24,NSE:HDFCMID150,Nifty Midcap 150,22.00,675,,"14,850",675,"14,850",22.00,21.30,,22.00,-3.18%,-473,-3.18%,16,20,-473,-3.18%,23.32,,Nifty 100 Low Vol 30 ETF,"18,425",2.31%,-689,-3.74%
+25-Sep-24,NSE:PHARMABEES,Nifty Pharma TRI,23.63,812,,"19,188",812,"19,188",23.63,22.80,,23.63,-3.51%,-674,-3.51%,15,19,-674,-3.51%,25.05,,Nifty 100 Low Volatility 30 Index,"14,012",1.76%,-620,-4.42%
+01-Oct-24,NSE:NV20,Nifty50 Value 20,164.00,97,,"15,908",97,"15,908",,,,,,,,,,,,173.84,,Nifty India Consumption Index,"32,809",4.12%,"-1,308",-3.99%
+13-May-25,NSE:NV20,Nifty50 Value 20,148.30,120,,"17,796",217,"33,704",155.32,143.89,,148.30,-2.97%,"-2,480",-7.36%,18,5,-529,-2.97%,157.20,,Nifty Auto TRI,"15,903",2.00%,-961,-6.04%
+03-Oct-24,NSE:MIDSELIETF,S&P BSE Midcap Select Index,18.70,950,,"17,765",950,"17,765",18.70,17.11,,18.70,-8.50%,"-1,511",-8.50%,2,2,"-1,511",-8.50%,19.82,,NIFTY Alpha 50 Index,"30,997",3.89%,"-1,733",-5.59%
+09-Oct-24,NSE:FMCGIETF,Nifty FMCG Index,65.65,241,,"15,822",241,"15,822",,,,,,,,,,,,69.59,,Nifty Next 50,"13,561",1.70%,-721,-5.32%
+09-Jun-25,NSE:FMCGIETF,Nifty FMCG Index,59.55,251,,"14,947",492,"30,769",62.54,60.00,,59.55,0.76%,"-1,249",-4.06%,26,16,113,0.76%,63.12,,Nifty Healthcare TRI,"16,882",2.12%,276,1.63%
+10-Oct-24,NSE:LOWVOL1,Nifty 100 Low Vol 30 ETF,21.40,861,,"18,425",861,"18,425",21.40,20.60,,21.40,-3.74%,-689,-3.74%,13,17,-689,-3.74%,22.68,,NIFTY IT Index,"44,536",5.59%,"-3,597",-8.08%
+15-Oct-24,NSE:LOWVOLIETF,Nifty 100 Low Volatility 30 Index,22.60,620,,"14,012",620,"14,012",22.60,21.60,,22.60,-4.42%,-620,-4.42%,11,14,-620,-4.42%,23.96,,Gold,"54,967",6.91%,914,1.66%
+16-Oct-24,NSE:CONSUMIETF,Nifty India Consumption Index,127.00,140,,"17,780",140,"17,780",127.00,120.33,,127.00,-5.25%,-934,-5.25%,9,12,-934,-5.25%,134.62,,Nifty 200 Momentum 30 Total Return Index,"14,111",1.77%,-614,-4.35%
+17-Oct-24,NSE:AUTOBEES,Nifty Auto TRI,256.50,62,,"15,903",62,"15,903",256.50,241.00,,256.50,-6.04%,-961,-6.04%,6,8,-961,-6.04%,271.89,,Nifty 200 Momentum 30 ETF,"18,816",2.36%,-853,-4.53%
+18-Oct-24,NSE:CONSUMBEES,Nifty India Consumption Index,133.00,113,,"15,029",113,"15,029",133.00,129.69,,133.00,-2.49%,-374,-2.49%,20,22,-374,-2.49%,140.98,,Nifty Dividend Opportunities 50 TRI,"19,969",2.51%,-605,-3.03%
+22-Oct-24,NSE:ALPHA,NIFTY Alpha 50 Index,54.85,290,,"15,907",290,"15,907",,,,,,,,,,,,58.14,,Nifty 200 Quality 30 ETF,"18,743",2.35%,-344,-1.84%
+18-Jun-25,NSE:ALPHA,NIFTY Alpha 50 Index,50.30,300,,"15,090",590,"30,997",52.54,49.60,,50.30,-1.39%,"-1,733",-5.59%,24,10,-210,-1.39%,53.32,,NIFTY Smallcap 250 ETF,"17,809",2.24%,-429,-2.41%
+23-Oct-24,NSE:NEXT50IETF,Nifty Next 50,73.30,185,,"13,561",185,"13,561",73.30,69.40,,73.30,-5.32%,-721,-5.32%,8,11,-721,-5.32%,77.70,,Nifty Private Bank Index,"13,770",1.73%,-185,-1.34%
+12-Dec-24,NSE:HEALTHY,Nifty Healthcare TRI,14.68,"1,150",,"16,882","1,150","16,882",14.68,14.92,,14.68,1.63%,276,1.63%,29,29,276,1.63%,15.56,,,,,,
+24-Feb-25,NSE:IT,NIFTY IT Index,42.29,380,,"16,070",380,"16,070",42.29,37.91,,42.29,-10.36%,"-1,664",-10.36%,1,1,"-1,664",-10.36%,44.83,,,,,,
+03-Jun-25,NSE:NV20IETF,Nifty50 Value 20,14.37,"1,100",,"15,807","1,100","15,807",14.37,14.14,,14.37,-1.60%,-253,-1.60%,23,25,-253,-1.60%,15.23,,,,,,
+30-Jun-25,NSE:GOLDBEES,Gold,79.65,265,,"21,107",265,"21,107",79.65,81.85,,79.65,2.76%,583,2.76%,30,30,583,2.76%,84.43,,,,,,
+02-Jul-25,NSE:GOLD1,Gold,81.55,210,,"17,126",210,"17,126",81.55,82.42,,81.55,1.07%,183,1.07%,28,28,183,1.07%,86.44,,,,,,
+03-Jul-25,NSE:SETFGOLD,Gold,83.67,200,,"16,734",200,"16,734",83.67,84.41,,83.67,0.88%,148,0.88%,27,27,148,0.88%,88.69,,,,,,
+04-Jul-25,NSE:MOMOMENTUM,Nifty 200 Momentum 30 Total Return Index,63.85,221,,"14,111",221,"14,111",63.85,61.07,,63.85,-4.35%,-614,-4.35%,12,15,-614,-4.35%,67.68,,,,,,
+07-Jul-25,NSE:MOM30IETF,Nifty 200 Momentum 30 ETF,32.00,588,,"18,816",588,"18,816",32.00,30.55,,32.00,-4.53%,-853,-4.53%,10,13,-853,-4.53%,33.92,,,,,,
+14-Jul-25,NSE:ITIETF,NIFTY IT Index,40.30,335,,"13,501",335,"13,501",40.30,37.80,,40.30,-6.20%,-838,-6.20%,5,7,-838,-6.20%,42.72,,,,,,
+16-Jul-25,NSE:ITBEES,NIFTY IT Index,41.00,365,,"14,965",365,"14,965",41.00,38.00,,41.00,-7.32%,"-1,095",-7.32%,3,6,"-1,095",-7.32%,43.46,,,,,,
+22-Jul-25,NSE:DIVOPPBEES,Nifty Dividend Opportunities 50 TRI,78.62,254,,"19,969",254,"19,969",78.62,76.24,,78.62,-3.03%,-605,-3.03%,17,21,-605,-3.03%,83.34,,,,,,
+24-Jul-25,NSE:NIFTYQLITY,Nifty 200 Quality 30 ETF,21.25,882,,"18,743",882,"18,743",21.25,20.86,,21.25,-1.84%,-344,-1.84%,22,24,-344,-1.84%,22.53,,,,,,
+28-Jul-25,NSE:HDFCSML250,NIFTY Smallcap 250 ETF,174.60,102,,"17,809",102,"17,809",174.60,170.39,,174.60,-2.41%,-429,-2.41%,21,23,-429,-2.41%,185.08,,,,,,
+29-Jul-25,NSE:HDFCPVTBAN,Nifty Private Bank Index,27.54,500,,"13,770",500,"13,770",27.54,27.17,,27.54,-1.34%,-185,-1.34%,25,26,-185,-1.34%,29.19,,,,,,

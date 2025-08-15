@@ -1,6 +1,6 @@
 import React from 'react';
 import { useETFTrading } from '../context/ETFTradingContext';
-import { BookOpen, TrendingDown, TrendingUp, Target, AlertTriangle, CheckCircle } from 'lucide-react';
+import { BookOpen, TrendingDown, TrendingUp, Target, AlertTriangle, CheckCircle, Lightbulb } from 'lucide-react';
 
 const Strategy = () => {
   const { targetProfit, averagingThreshold, maxETFsPerSector } = useETFTrading();
@@ -102,167 +102,190 @@ const Strategy = () => {
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">ETF Trading Strategy</h1>
-        <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          This application implements the LIFO (Last In First Out) ETF trading strategy based on percentage difference from 20-day moving average.
-        </p>
-      </div>
-
-      {/* Disclaimer */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <div className="flex items-start">
-          <AlertTriangle className="w-6 h-6 text-yellow-600 mt-0.5 mr-3" />
-          <div>
-            <h3 className="text-lg font-medium text-yellow-800 mb-2">Important Disclaimer</h3>
-            <p className="text-yellow-700">
-              This strategy is for educational purposes only. Anyone using it for their investment will be fully responsible for the profits or losses incurred. 
-              Past performance does not guarantee future results. Please consult with a financial advisor before making investment decisions.
+    <div className="min-h-screen bg-upstox-primary text-upstox-primary">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8">
+          {/* Header */}
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-accent-blue to-accent-blue-light rounded-xl flex items-center justify-center">
+                <BookOpen className="h-7 w-7 text-white" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-upstox-primary mb-4">ETF Trading Strategy</h1>
+            <p className="text-lg text-upstox-secondary max-w-3xl mx-auto">
+              This application implements the LIFO (Last In First Out) ETF trading strategy based on percentage difference from 20-day moving average.
             </p>
           </div>
-        </div>
-      </div>
 
-      {/* Current Settings */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Current Strategy Settings</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <Target className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Target Profit</p>
-            <p className="text-2xl font-bold text-blue-600">{targetProfit}%</p>
-          </div>
-          <div className="text-center p-4 bg-orange-50 rounded-lg">
-            <TrendingDown className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Averaging Threshold</p>
-            <p className="text-2xl font-bold text-orange-600">{averagingThreshold}%</p>
-          </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <BookOpen className="w-8 h-8 text-green-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Max ETFs per Sector</p>
-            <p className="text-2xl font-bold text-green-600">{maxETFsPerSector}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Strategy Steps */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Strategy Steps</h2>
-        </div>
-        <div className="p-6 space-y-6">
-          {strategySteps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div key={step.step} className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-blue-600">{step.step}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Icon className="w-5 h-5 text-gray-500" />
-                    <h3 className="text-lg font-medium text-gray-900">{step.title}</h3>
-                  </div>
-                  <p className="text-gray-700 mb-2">{step.description}</p>
-                  {step.details && (
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">{step.details}</p>
-                  )}
-                </div>
+          {/* Disclaimer */}
+          <div className="card-upstox p-6">
+            <div className="flex items-start">
+              <AlertTriangle className="w-6 h-6 text-upstox-primary mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-medium text-upstox-primary mb-2">Important Disclaimer</h3>
+                <p className="text-upstox-secondary">
+                  This strategy is for educational purposes only. Anyone using it for their investment will be fully responsible for the profits or losses incurred. 
+                  Past performance does not guarantee future results. Please consult with a financial advisor before making investment decisions.
+                </p>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Next Day Rules */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Next Day Rules</h2>
-        </div>
-        <div className="p-6 space-y-6">
-          {nextDayRules.map((rule) => {
-            const Icon = rule.icon;
-            return (
-              <div key={rule.rule} className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-green-600">{rule.rule}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Icon className="w-5 h-5 text-gray-500" />
-                    <h3 className="text-lg font-medium text-gray-900">{rule.title}</h3>
-                  </div>
-                  <p className="text-gray-700 mb-2">{rule.description}</p>
-                  {rule.details && (
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">{rule.details}</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Selling Rules */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Selling Rules</h2>
-        </div>
-        <div className="p-6">
-          {sellingRules.map((rule, index) => {
-            const Icon = rule.icon;
-            return (
-              <div key={index} className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                  <Icon className="w-5 h-5 text-red-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">{rule.title}</h3>
-                  <p className="text-gray-700 mb-2">{rule.description}</p>
-                  {rule.details && (
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">{rule.details}</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Features */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Application Features</h2>
-        </div>
-        <div className="p-6 space-y-6">
-          {features.map((feature, index) => (
-            <div key={index}>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">{feature.title}</h3>
-              <ul className="space-y-2">
-                {feature.features.map((item, itemIndex) => (
-                  <li key={itemIndex} className="flex items-start space-x-2">
-                    <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700">{item}</span>
-                  </li>
-                ))}
-              </ul>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Tips */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-900 mb-3">Pro Tips</h3>
-        <ul className="space-y-2 text-blue-800">
-          <li>• Always check the ETF ranking before making any purchase decision</li>
-          <li>• Stick to the 6% profit target for selling (LIFO method)</li>
-          <li>• Use averaging only when ETFs fall more than 2.5% from last purchase</li>
-          <li>• Maximum 3 ETFs per sector to avoid over-concentration</li>
-          <li>• Monitor your holdings regularly for profit targets</li>
-          <li>• Keep track of monthly performance to analyze strategy effectiveness</li>
-        </ul>
+          {/* Current Settings */}
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+              <h2 className="text-xl font-semibold text-upstox-primary">Current Strategy Settings</h2>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center p-6 bg-upstox-tertiary rounded-xl">
+                  <Target className="w-8 h-8 text-accent-blue mx-auto mb-3" />
+                  <p className="text-sm text-upstox-secondary mb-1">Target Profit</p>
+                  <p className="text-2xl font-bold text-accent-blue">{targetProfit}%</p>
+                </div>
+                <div className="text-center p-6 bg-upstox-tertiary rounded-xl">
+                  <TrendingDown className="w-8 h-8 text-accent-blue mx-auto mb-3" />
+                  <p className="text-sm text-upstox-secondary mb-1">Averaging Threshold</p>
+                  <p className="text-2xl font-bold text-upstox-primary">{averagingThreshold}%</p>
+                </div>
+                <div className="text-center p-6 bg-upstox-tertiary rounded-xl">
+                  <BookOpen className="w-8 h-8 text-positive mx-auto mb-3" />
+                  <p className="text-sm text-upstox-secondary mb-1">Max ETFs per Sector</p>
+                  <p className="text-2xl font-bold text-positive">{maxETFsPerSector}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Strategy Steps */}
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+              <h2 className="text-xl font-semibold text-upstox-primary">Strategy Steps</h2>
+            </div>
+            <div className="p-6">
+              <div className="space-y-6">
+                {strategySteps.map((step) => {
+                  const Icon = step.icon;
+                  return (
+                    <div key={step.step} className="flex items-start space-x-4">
+                      <div className="flex-shrink-0 w-10 h-10 bg-upstox-tertiary rounded-full flex items-center justify-center">
+                        <span className="text-sm font-semibold text-upstox-secondary">{step.step}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <Icon className="w-5 h-5 text-upstox-secondary" />
+                          <h3 className="text-lg font-semibold text-upstox-primary">{step.title}</h3>
+                        </div>
+                        <p className="text-upstox-secondary mb-3">{step.description}</p>
+                        {step.details && (
+                          <p className="text-sm text-upstox-secondary bg-upstox-tertiary p-4 rounded-lg border border-upstox-primary">{step.details}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Next Day Rules */}
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+              <h2 className="text-xl font-semibold text-upstox-primary">Next Day Rules</h2>
+            </div>
+            <div className="p-6">
+              <div className="space-y-6">
+                {nextDayRules.map((rule) => {
+                  const Icon = rule.icon;
+                  return (
+                    <div key={rule.rule} className="flex items-start space-x-4">
+                      <div className="flex-shrink-0 w-10 h-10 bg-upstox-tertiary rounded-full flex items-center justify-center">
+                        <span className="text-sm font-semibold text-upstox-secondary">{rule.rule}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <Icon className="w-5 h-5 text-upstox-secondary" />
+                          <h3 className="text-lg font-semibold text-upstox-primary">{rule.title}</h3>
+                        </div>
+                        <p className="text-upstox-secondary mb-3">{rule.description}</p>
+                        {rule.details && (
+                          <p className="text-sm text-upstox-secondary bg-upstox-tertiary p-4 rounded-lg border border-upstox-primary">{rule.details}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Selling Rules */}
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+              <h2 className="text-xl font-semibold text-upstox-primary">Selling Rules</h2>
+            </div>
+            <div className="p-6">
+              {sellingRules.map((rule, index) => {
+                const Icon = rule.icon;
+                return (
+                  <div key={index} className="flex items-start space-x-4">
+                    <div className="flex-shrink-0 w-10 h-10 bg-upstox-tertiary rounded-full flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-upstox-secondary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-upstox-primary mb-3">{rule.title}</h3>
+                      <p className="text-upstox-secondary mb-3">{rule.description}</p>
+                      {rule.details && (
+                        <p className="text-sm text-upstox-secondary bg-upstox-tertiary p-4 rounded-lg border border-upstox-primary">{rule.details}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Features */}
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+              <h2 className="text-xl font-semibold text-upstox-primary">Application Features</h2>
+            </div>
+            <div className="p-6">
+              <div className="space-y-6">
+                {features.map((feature, index) => (
+                  <div key={index}>
+                    <h3 className="text-lg font-semibold text-upstox-primary mb-4">{feature.title}</h3>
+                    <ul className="space-y-3">
+                      {feature.features.map((item, itemIndex) => (
+                        <li key={itemIndex} className="flex items-start space-x-3">
+                          <CheckCircle className="w-5 h-5 text-positive mt-0.5 flex-shrink-0" />
+                          <span className="text-upstox-secondary">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div className="card-upstox p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Lightbulb className="w-6 h-6 text-accent-blue" />
+              <h3 className="text-lg font-semibold text-upstox-primary">Pro Tips</h3>
+            </div>
+            <ul className="space-y-2 text-upstox-secondary">
+              <li>• Always check the ETF ranking before making any purchase decision</li>
+              <li>• Stick to the 6% profit target for selling (LIFO method)</li>
+              <li>• Use averaging only when ETFs fall more than 2.5% from last purchase</li>
+              <li>• Maximum 3 ETFs per sector to avoid over-concentration</li>
+              <li>• Monitor your holdings regularly for profit targets</li>
+              <li>• Keep track of monthly performance to analyze strategy effectiveness</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

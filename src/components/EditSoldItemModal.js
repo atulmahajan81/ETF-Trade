@@ -3,7 +3,7 @@ import { useETFTrading } from '../context/ETFTradingContext';
 import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
 
 const EditSoldItemModal = ({ isOpen, onClose, soldItem, mode = 'edit' }) => {
-  const { dispatch } = useETFTrading();
+  const { dispatch, saveCriticalData } = useETFTrading();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errors, setErrors] = useState({});
@@ -150,6 +150,10 @@ const EditSoldItemModal = ({ isOpen, onClose, soldItem, mode = 'edit' }) => {
       };
 
       dispatch({ type: 'UPDATE_SOLD_ITEM', payload: updatedSoldItem });
+      // Immediate save after manual edit
+      if (saveCriticalData) {
+        setTimeout(() => saveCriticalData('manual sold item edit'), 100);
+      }
       onClose();
     } catch (error) {
       console.error('Error updating sold item:', error);
@@ -161,6 +165,10 @@ const EditSoldItemModal = ({ isOpen, onClose, soldItem, mode = 'edit' }) => {
   const handleDelete = () => {
     if (!soldItem) return;
     dispatch({ type: 'REMOVE_SOLD_ITEM', payload: soldItem.id });
+    // Immediate save after manual delete
+    if (saveCriticalData) {
+      setTimeout(() => saveCriticalData('manual sold item delete'), 100);
+    }
     onClose();
   };
 

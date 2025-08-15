@@ -16,7 +16,8 @@ from typing import Dict, List, Optional
 
 class MStocksPriceFetcher:
     def __init__(self):
-        self.base_url = "https://api.mstock.trade/openapi/typea"
+        self.base_url = "https://api.mstock.trade/openapi/typea"  # Keep Type A for login/session
+        self.typeb_base_url = "https://api.mstock.trade/openapi/typeb"  # Type B for market data
         self.access_token = None
         self.api_key = None
         self.token_expiry = None
@@ -128,23 +129,37 @@ class MStocksPriceFetcher:
                 print("❌ Session validation failed - Unauthorized")
                 self.clear_session()
                 return False
+            elif response.status_code == 403:
+                print("⚠️ Session validation failed - Forbidden (might be temporary)")
+                # Don't clear session for 403 errors immediately, might be temporary
+                return False
             else:
                 print(f"❌ Session validation failed - Status: {response.status_code}")
                 # Don't clear session for 404 errors (symbol not found is okay)
                 if response.status_code != 404:
-                    self.clear_session()
+                    # Only clear session for 5xx errors, not 4xx errors
+                    if response.status_code >= 500:
+                        self.clear_session()
                 return False
         except Exception as e:
             print(f"❌ Session validation error: {str(e)}")
-            self.clear_session()
+            # Don't clear session on network errors
             return False
     
     def auto_refresh_session(self) -> bool:
         """Automatically refresh session if needed"""
-        if not self.validate_session():
-            print("🔄 Session invalid, auto-refresh disabled to prevent unnecessary OTPs")
-            return False
-        return True
+        if self.validate_session():
+            return True
+        
+        print("🔄 Session validation failed, but continuing with saved session...")
+        # If we have a saved session, try to use it even if validation fails
+        # This allows the session to be used for price fetching
+        if self.access_token and self.api_key:
+            print("✅ Using saved session for price fetching")
+            return True
+        
+        print("❌ No valid session available")
+        return False
     
     def auto_login(self) -> bool:
         """Automatically login using saved credentials"""
@@ -208,62 +223,181 @@ class MStocksPriceFetcher:
             print(f"❌ Login failed: {str(e)}")
             return {'status': 'error', 'message': str(e)}
     
-    def generate_session(self, api_key: str, request_token: str, otp: str = None) -> Dict:
-        """Step 2: Generate session with API key and OTP"""
+    def generate_session(self, api_key, request_token, otp):
+        """
+        Generate session with API key and OTP
+        Based on official MStocks API documentation
+        """
         try:
-            headers = {
-                'X-Mirae-Version': '1',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
+            print(f"🔐 Generating session with API key and OTP...")
+            print(f"API Key: {api_key[:20]}...")
+            print(f"Request Token (OTP): {request_token}")
             
-            # Based on working script: OTP should be sent as request_token
+            # According to official docs: request_token should be the OTP
             payload = {
                 'api_key': api_key,
-                'request_token': request_token,  # Use OTP as request_token (as per working script)
-                'checksum': 'L'  # Default checksum as per working script
+                'request_token': request_token,  # This should be the OTP
+                'checksum': 'L'  # Default checksum as per documentation
             }
             
-            print(f"🔐 Generating session with API key: {api_key[:10]}...")
-            print(f"🔍 Using official MStocks API endpoint: /session/token")
-            print(f"🔍 Payload: {payload}")
+            response = requests.post(
+                f'{self.base_url}/session/token',
+                headers={
+                    'X-Mirae-Version': '1',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                data=payload,
+                timeout=30
+            )
             
-            url = f"{self.base_url}/session/token"
-            response = requests.post(url, headers=headers, data=payload, timeout=30)
+            print(f"📡 Session generation response status: {response.status_code}")
             
             if response.status_code == 200:
-                result = response.json()
-                print(f"✅ Session generated successfully")
+                data = response.json()
+                print(f"📊 Session response: {json.dumps(data, indent=2)}")
                 
-                # Store credentials and set expiry
-                self.access_token = result.get('data', {}).get('access_token')
-                self.api_key = api_key
-                self.token_expiry = datetime.now() + self.session_duration
-                
-                if self.access_token:
-                    print(f"✅ Access token obtained: {self.access_token[:20]}...")
-                    print(f"⏰ Session expires at: {self.token_expiry}")
+                if data.get('status') == 'success':
+                    self.access_token = data['data']['access_token']
+                    self.api_key = api_key  # Store the API key
+                    self.enctoken = data['data'].get('enctoken', '')
+                    self.refresh_token = data['data'].get('refresh_token', '')
                     
-                    # Save session to file
+                    print(f"✅ Session generated successfully!")
+                    print(f"Access Token: {self.access_token[:20]}...")
+                    print(f"API Key: {self.api_key[:20]}...")
+                    print(f"Enc Token: {self.enctoken[:20] if self.enctoken else 'None'}...")
+                    
+                    # Save session for persistence
                     self.save_session()
-                
-                return result
+                    return True
+                else:
+                    print(f"❌ Session generation failed: {data.get('message', 'Unknown error')}")
+                    return False
             else:
-                print(f"❌ Session generation failed: {response.status_code} - {response.text}")
-                print(f"🔍 URL: {url}")
-                print(f"🔍 Headers: {headers}")
-                print(f"🔍 Payload: {payload}")
-                return {'status': 'error', 'message': f'Session generation failed: {response.status_code} - {response.text}'}
+                print(f"❌ Session generation failed with status {response.status_code}")
+                print(f"Response: {response.text}")
+                return False
                 
         except Exception as e:
-            print(f"❌ Session generation failed: {str(e)}")
-            return {'status': 'error', 'message': str(e)}
+            print(f"❌ Session generation error: {str(e)}")
+            return False
     
     def get_live_price(self, symbol: str) -> Dict:
-        """Get live price for a symbol with session validation"""
+        """Get live price for a symbol with session validation using Type B API"""
         # Auto-refresh session if needed
         if not self.auto_refresh_session():
             return {'status': 'error', 'message': 'Session expired and auto-refresh failed. Please login again.'}
         
+        try:
+            # Clean symbol
+            clean_symbol = symbol.replace('NSE:', '').replace('BSE:', '')
+            
+            # Use Type B API as per official documentation
+            headers = {
+                'X-Mirae-Version': '1',
+                'Authorization': f'Bearer {self.access_token}',  # Type B uses Bearer token
+                'X-PrivateKey': self.api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            # Try different symbol formats for Type B API
+            symbol_formats = [
+                f"NSE:{clean_symbol}-EQ",
+                f"NSE:{clean_symbol}",
+                clean_symbol,
+                f"{clean_symbol}-EQ"
+            ]
+            
+            for symbol_format in symbol_formats:
+                try:
+                    # Use Type B API endpoint as per official docs
+                    url = f"{self.typeb_base_url}/instruments/quote"
+                    
+                    # Prepare payload as per Type B API documentation
+                    payload = {
+                        "mode": "LTP",  # Use LTP mode for live price
+                        "exchangeTokens": {
+                            "NSE": [clean_symbol]  # We'll need to get the actual token
+                        }
+                    }
+                    
+                    print(f"🔍 Trying Type B API for symbol: {symbol_format}")
+                    response = requests.get(url, headers=headers, json=payload, timeout=10)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        price = self._extract_price_typeb(data, clean_symbol)
+                        
+                        if price is not None:
+                            return {
+                                'status': 'success',
+                                'price': price,
+                                'symbol': symbol,
+                                'source': 'MStocks Type B API',
+                                'timestamp': datetime.now().isoformat()
+                            }
+                    else:
+                        print(f"❌ Type B API failed for {symbol_format}: {response.status_code}")
+                        print(f"Response: {response.text}")
+                        
+                except Exception as e:
+                    print(f"❌ Error with Type B API for {symbol_format}: {str(e)}")
+                    continue
+            
+            # Fallback to Type A API if Type B fails
+            print("🔄 Falling back to Type A API...")
+            return self._get_live_price_typea(symbol)
+            
+        except Exception as e:
+            print(f"❌ Get live price error: {str(e)}")
+            return {'status': 'error', 'message': str(e)}
+    
+    def _extract_price_typeb(self, data: Dict, clean_symbol: str) -> Optional[float]:
+        """Extract price from Type B API response"""
+        try:
+            if data.get('status') == 'true' and data.get('data'):
+                fetched_data = data['data'].get('fetched', [])
+                
+                for item in fetched_data:
+                    if item.get('exchange') == 'NSE' and item.get('tradingSymbol', '').startswith(clean_symbol):
+                        price = float(item.get('ltp', 0))
+                        if price > 0:
+                            print(f"💰 Found Type B price for {clean_symbol}: {price}")
+                            return price
+            
+            print(f"❌ No valid Type B price found in response")
+            return None
+            
+        except Exception as e:
+            print(f"❌ Type B price extraction error: {str(e)}")
+            return None
+    
+    def _extract_price(self, data: Dict, symbol_format: str, clean_symbol: str) -> Optional[float]:
+        """Extract price from Type A API response"""
+        try:
+            if data.get('status') == 'success' and data.get('data'):
+                data_content = data['data']
+                
+                # Handle the format from working script: data['data']['NSE:SYMBOL']
+                if isinstance(data_content, dict):
+                    # Try different symbol keys
+                    for symbol_key in [symbol_format, f"NSE:{clean_symbol}", clean_symbol]:
+                        if symbol_key in data_content:
+                            item = data_content[symbol_key]
+                            if isinstance(item, dict) and 'last_price' in item:
+                                price = float(item['last_price'])
+                                print(f"💰 Found Type A price in {symbol_key}.last_price: {price}")
+                                return price
+            
+            print(f"❌ No valid Type A price found in response")
+            return None
+            
+        except Exception as e:
+            print(f"❌ Type A price extraction error: {str(e)}")
+            return None
+    
+    def _get_live_price_typea(self, symbol: str) -> Dict:
+        """Fallback method using Type A API"""
         try:
             # Clean symbol
             clean_symbol = symbol.replace('NSE:', '').replace('BSE:', '')
@@ -287,7 +421,7 @@ class MStocksPriceFetcher:
                     # Use the LTP endpoint from working script
                     url = f"{self.base_url}/instruments/quote/ltp?i={symbol_format}"
                     
-                    print(f"🔍 Trying symbol format: {symbol_format}")
+                    print(f"🔍 Trying Type A symbol format: {symbol_format}")
                     response = requests.get(url, headers=headers, timeout=10)
                     
                     if response.status_code == 200:
@@ -299,14 +433,14 @@ class MStocksPriceFetcher:
                                 'status': 'success',
                                 'price': price,
                                 'symbol': symbol,
-                                'source': 'MStocks API',
+                                'source': 'MStocks Type A API (Fallback)',
                                 'timestamp': datetime.now().isoformat()
                             }
                     else:
-                        print(f"❌ Failed for {symbol_format}: {response.status_code}")
+                        print(f"❌ Type A failed for {symbol_format}: {response.status_code}")
                         
                 except Exception as e:
-                    print(f"❌ Error with {symbol_format}: {str(e)}")
+                    print(f"❌ Error with Type A {symbol_format}: {str(e)}")
                     continue
             
             # If all formats failed, try search endpoint
@@ -320,7 +454,7 @@ class MStocksPriceFetcher:
                         found_symbol = search_data['data'][0].get('symbol')
                         if found_symbol:
                             print(f"🔍 Found symbol via search: {found_symbol}")
-                            return self.get_live_price(found_symbol)
+                            return self._get_live_price_typea(found_symbol)
             except Exception as e:
                 print(f"❌ Search failed: {str(e)}")
             
@@ -331,32 +465,8 @@ class MStocksPriceFetcher:
             }
             
         except Exception as e:
-            print(f"❌ Get live price error: {str(e)}")
+            print(f"❌ Type A fallback error: {str(e)}")
             return {'status': 'error', 'message': str(e)}
-    
-    def _extract_price(self, data: Dict, symbol_format: str, clean_symbol: str) -> Optional[float]:
-        """Extract price from API response"""
-        try:
-            if data.get('status') == 'success' and data.get('data'):
-                data_content = data['data']
-                
-                # Handle the format from working script: data['data']['NSE:SYMBOL']
-                if isinstance(data_content, dict):
-                    # Try different symbol keys
-                    for symbol_key in [symbol_format, f"NSE:{clean_symbol}", clean_symbol]:
-                        if symbol_key in data_content:
-                            item = data_content[symbol_key]
-                            if isinstance(item, dict) and 'last_price' in item:
-                                price = float(item['last_price'])
-                                print(f"💰 Found price in {symbol_key}.last_price: {price}")
-                                return price
-            
-            print(f"❌ No valid price found in response")
-            return None
-            
-        except Exception as e:
-            print(f"❌ Price extraction error: {str(e)}")
-            return None
     
     def get_multiple_prices(self, symbols: List[str]) -> Dict:
         """Get live prices for multiple symbols"""

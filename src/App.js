@@ -11,6 +11,7 @@ import DataImport from './components/DataImport';
 import UserSetup from './components/UserSetup';
 import UserAuth from './components/UserAuth';
 import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import Profile from './pages/Profile';
 
 const AppContent = () => {
@@ -22,19 +23,6 @@ const AppContent = () => {
   console.log('auth.currentUser:', auth.currentUser);
   console.log('userSetup.isCompleted:', userSetup.isCompleted);
   console.log('showDataImport:', showDataImport);
-
-  // Direct check for existing user from localStorage
-  const checkExistingUser = () => {
-    if (auth.currentUser && auth.currentUser.uid) {
-      const savedUsers = localStorage.getItem('etfUsers');
-      const users = savedUsers ? JSON.parse(savedUsers) : {};
-      const userData = users[auth.currentUser.uid];
-      const isExistingUser = userData?.userSetup?.isCompleted;
-      console.log('Direct localStorage check - isExistingUser:', isExistingUser);
-      return isExistingUser;
-    }
-    return false;
-  };
 
   const handleUserSetupComplete = (userData) => {
     console.log('User setup completed:', userData);
@@ -63,7 +51,7 @@ const AppContent = () => {
     await userSignup(userData);
   };
 
-  // If not authenticated, show login/signup
+  // Always show login/signup if not authenticated
   if (!auth.isAuthenticated) {
     console.log('🔐 Showing UserAuth - user not authenticated');
     return <UserAuth onLogin={handleLogin} onSignup={handleSignup} />;
@@ -71,40 +59,48 @@ const AppContent = () => {
 
   // Check if user is an existing user (has completed setup before)
   const isExistingUser = auth.currentUser && auth.currentUser.isExistingUser;
-  const directCheckExistingUser = checkExistingUser();
-  const finalIsExistingUser = isExistingUser || directCheckExistingUser;
   
   console.log('Is existing user (state):', isExistingUser);
-  console.log('Is existing user (direct check):', directCheckExistingUser);
-  console.log('Final is existing user:', finalIsExistingUser);
+  console.log('User setup completed:', userSetup.isCompleted);
   
   // If authenticated but user setup not completed AND not an existing user, show user setup
-  if (!userSetup.isCompleted && !finalIsExistingUser) {
+  if (!userSetup.isCompleted && !isExistingUser) {
     console.log('🆕 Showing UserSetup component for new user');
     return <UserSetup onComplete={handleUserSetupComplete} />;
   }
 
   // Show data import ONLY for new users with ETF experience (not existing users)
-  if (showDataImport && !finalIsExistingUser) {
+  if (showDataImport && !isExistingUser) {
     console.log('📁 Showing DataImport component for new user with ETF experience');
     return <DataImport onImportComplete={handleDataImportComplete} />;
   }
 
   console.log('🏠 Showing main app - user is authenticated and setup is complete');
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar onLogout={userLogout} currentUser={auth.currentUser} />
-      <div className="pt-16">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/holdings" element={<Holdings />} />
-          <Route path="/sold-items" element={<SoldItems />} />
-          <Route path="/etf-ranking" element={<ETFRanking />} />
-          <Route path="/strategy" element={<Strategy />} />
-          <Route path="/money-management" element={<MoneyManagement />} />
-          <Route path="/data-import" element={<DataImport onImportComplete={handleDataImportComplete} />} />
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
+    <div className="flex h-screen bg-upstox-primary">
+      {/* Sidebar */}
+      <Sidebar currentUser={auth.currentUser} />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Navbar */}
+        <Navbar onLogout={userLogout} currentUser={auth.currentUser} />
+        {/* Global Ticker removed as requested */}
+        
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/holdings" element={<Holdings />} />
+            <Route path="/sold-items" element={<SoldItems />} />
+            <Route path="/etf-ranking" element={<ETFRanking />} />
+            {/* Eligible page removed - content moved to Dashboard */}
+            <Route path="/strategy" element={<Strategy />} />
+            <Route path="/money-management" element={<MoneyManagement />} />
+            <Route path="/data-import" element={<DataImport onImportComplete={handleDataImportComplete} />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+        </main>
       </div>
     </div>
   );

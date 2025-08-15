@@ -1,18 +1,47 @@
-import React, { useState } from 'react';
-import { User, Lock, Key, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Lock, Key, LogIn, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import pythonPriceApiService from '../services/pythonPriceApi';
 
-const SimpleLoginForm = ({ onLoginSuccess }) => {
+const SimpleLoginForm = ({ onLoginSuccess, onLoginError }) => {
   const [credentials, setCredentials] = useState({
-    username: '',
-    password: '',
-    apiKey: ''
+    username: 'MA24923',
+    password: 'Daksh@123',
+    apiKey: 'RNGlIJO6Ua+J0NWjZ+jnyA=='
   });
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState(null);
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [otp, setOtp] = useState('');
   const [requestToken, setRequestToken] = useState('');
+  const [sessionStatus, setSessionStatus] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Check session status on component mount
+  useEffect(() => {
+    checkSessionStatus();
+  }, []);
+
+  const checkSessionStatus = async () => {
+    try {
+      setCheckingSession(true);
+      const status = await pythonPriceApiService.getSessionStatus();
+      setSessionStatus(status);
+      
+      // If already logged in, notify parent
+      if (status?.logged_in && status?.session_valid && onLoginSuccess) {
+        onLoginSuccess({
+          broker: 'MStocks',
+          username: status.username,
+          sessionStatus: status
+        });
+      }
+    } catch (error) {
+      console.warn('Could not check session status:', error.message);
+      setSessionStatus({ logged_in: false, session_valid: false });
+    } finally {
+      setCheckingSession(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -21,6 +50,8 @@ const SimpleLoginForm = ({ onLoginSuccess }) => {
       [name]: value
     }));
   };
+
+  // Removed auto-login flow
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -106,44 +137,59 @@ const SimpleLoginForm = ({ onLoginSuccess }) => {
         });
         return;
       } else {
-                          // Step 2: Generate session with API key and OTP
-                  console.log('2️⃣ Step 2: Generate session with API key and OTP...');
-                  const sessionResult = await pythonPriceApiService.generateSession(
-                    credentials.apiKey,
-                    requestToken,  // This will be ignored, OTP will be used as request_token
-                    otp
-                  );
-
-        if (sessionResult.status !== 'success') {
-          throw new Error(sessionResult.message || 'Session generation failed');
-        }
-
-        console.log('✅ Step 2 successful! Session generated.');
-
-        // Verify session is active
-        const sessionStatus = await pythonPriceApiService.getSessionStatus();
-        if (sessionStatus.logged_in && sessionStatus.session_valid) {
-          setStatus({
-            type: 'success',
-            message: 'Successfully logged in to MStocks! Session is active.',
-            sessionData: sessionStatus
-          });
-
-          if (onLoginSuccess) {
-            onLoginSuccess({
-              broker: 'MStocks',
-              username: credentials.username,
-              sessionStatus: sessionStatus
-            });
-          }
-          
-          // Reset OTP state
-          setShowOtpInput(false);
-          setOtp('');
-          setRequestToken('');
-        } else {
-          throw new Error('Session verification failed');
-        }
+        // Step 3: Generate session with API key and OTP
+        console.log("3️⃣ Step 3: Generating session with API key and OTP...");
+        
+        try {
+            const sessionResult = await pythonPriceApiService.generateSession(
+                credentials.apiKey,           // API key
+                requestToken,            // UGID from login (as request_token)
+                otp              // Actual OTP
+            );
+            
+            console.log("🔍 Session generation result:", sessionResult);
+            
+                         if (sessionResult.status === 'success') {
+                 setStatus({
+                     type: 'success',
+                     message: '✅ Login successful! Session generated.'
+                 });
+                 
+                 // Clear form
+                 setCredentials({ username: '', password: '', apiKey: '' });
+                 setOtp('');
+                 setShowOtpInput(false);
+                 setRequestToken('');
+                 
+                 // Refresh session status after successful login
+                 await checkSessionStatus();
+                 
+                 // Optionally redirect or update parent component
+                 if (onLoginSuccess) {
+                     onLoginSuccess({
+                         broker: 'MStocks',
+                         username: credentials.username,
+                         sessionStatus: sessionResult.data // Assuming sessionResult.data contains session info
+                     });
+                 }
+             } else {
+                 setStatus({
+                     type: 'error',
+                     message: `❌ Session generation failed: ${sessionResult.message}`
+                 });
+             }
+                 } catch (error) {
+             console.error("❌ Session generation error:", error);
+             setStatus({
+                 type: 'error',
+                 message: `❌ Session generation failed: ${error.message}`
+             });
+             
+             // Call onLoginError callback if provided
+             if (onLoginError) {
+                 onLoginError(error.message);
+             }
+         }
       }
 
     } catch (error) {
@@ -152,6 +198,11 @@ const SimpleLoginForm = ({ onLoginSuccess }) => {
         type: 'error',
         message: `Login failed: ${error.message}`
       });
+      
+      // Call onLoginError callback if provided
+      if (onLoginError) {
+        onLoginError(error.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -166,6 +217,8 @@ const SimpleLoginForm = ({ onLoginSuccess }) => {
         message: 'Session cleared successfully!'
       });
       setCredentials({ username: '', password: '', apiKey: '' });
+      // Refresh session status after clearing
+      await checkSessionStatus();
     } catch (error) {
       setStatus({
         type: 'error',
@@ -183,7 +236,45 @@ const SimpleLoginForm = ({ onLoginSuccess }) => {
         <h3 className="text-lg font-medium text-gray-900">MStocks Login</h3>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Session Status Display */}
+      {checkingSession ? (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+          <div className="flex items-center">
+            <RefreshCw className="w-4 h-4 text-blue-600 mr-2 animate-spin" />
+            <span className="text-sm text-blue-800">Checking session status...</span>
+          </div>
+        </div>
+      ) : sessionStatus?.logged_in && sessionStatus?.session_valid ? (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+              <div>
+                <span className="text-sm font-medium text-green-800">Already Logged In</span>
+                <p className="text-xs text-green-700">Username: {sessionStatus.username}</p>
+                <p className="text-xs text-green-700">Session: Active</p>
+              </div>
+            </div>
+            <button
+              onClick={checkSessionStatus}
+              className="text-xs text-green-600 hover:text-green-800"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+            <span className="text-sm text-yellow-800">Not logged in. Please login to continue.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Only show login form if not already logged in */}
+      {(!sessionStatus?.logged_in || !sessionStatus?.session_valid) && (
+        <form onSubmit={handleSubmit} className="space-y-4">
         {/* Username */}
         <div>
           <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
@@ -283,50 +374,53 @@ const SimpleLoginForm = ({ onLoginSuccess }) => {
 
         {/* Action Buttons */}
         <div className="flex gap-3">
-                     <button
-             type="submit"
-             disabled={isLoading || !credentials.username || !credentials.password || !credentials.apiKey || (showOtpInput && !otp)}
-             className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-           >
-             {isLoading ? (
-               <>
-                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                 {showOtpInput ? 'Verifying OTP...' : 'Logging in...'}
-               </>
-             ) : (
-               <>
-                 <LogIn className="w-4 h-4 mr-2" />
-                 {showOtpInput ? 'Verify OTP & Complete Login' : 'Login to MStocks'}
-               </>
-             )}
-           </button>
+          {/* Manual Login Button */}
+          <button
+            type="submit"
+            disabled={isLoading || !credentials.username || !credentials.password || !credentials.apiKey || (showOtpInput && !otp)}
+            className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                {showOtpInput ? 'Verifying OTP...' : 'Logging in...'}
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4 mr-2" />
+                {showOtpInput ? 'Verify OTP & Complete Login' : 'Manual Login'}
+              </>
+            )}
+          </button>
 
-                     {showOtpInput ? (
-             <button
-               type="button"
-               onClick={() => {
-                 setShowOtpInput(false);
-                 setOtp('');
-                 setRequestToken('');
-                 setStatus(null);
-               }}
-               disabled={isLoading}
-               className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-             >
-               Back
-             </button>
-           ) : (
-             <button
-               type="button"
-               onClick={handleClearSession}
-               disabled={isLoading}
-               className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-             >
-               Clear Session
-             </button>
-           )}
+          {/* Clear Session Button */}
+          {showOtpInput ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowOtpInput(false);
+                setOtp('');
+                setRequestToken('');
+                setStatus(null);
+              }}
+              disabled={isLoading}
+              className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Back
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleClearSession}
+              disabled={isLoading}
+              className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Clear Session
+            </button>
+          )}
         </div>
       </form>
+      )}
 
       {/* Session Info */}
       <div className="mt-6 p-4 bg-gray-50 rounded-md">

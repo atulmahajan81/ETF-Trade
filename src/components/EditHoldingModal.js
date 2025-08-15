@@ -3,7 +3,7 @@ import { useETFTrading } from '../context/ETFTradingContext';
 import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
 
 const EditHoldingModal = ({ isOpen, onClose, holding, mode = 'edit' }) => {
-  const { dispatch } = useETFTrading();
+  const { dispatch, saveCriticalData } = useETFTrading();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errors, setErrors] = useState({});
@@ -88,6 +88,10 @@ const EditHoldingModal = ({ isOpen, onClose, holding, mode = 'edit' }) => {
       };
 
       dispatch({ type: 'UPDATE_HOLDING', payload: updatedHolding });
+      // Immediate save after manual edit
+      if (saveCriticalData) {
+        setTimeout(() => saveCriticalData('manual holding edit'), 100);
+      }
       onClose();
     } catch (error) {
       console.error('Error updating holding:', error);
@@ -99,6 +103,10 @@ const EditHoldingModal = ({ isOpen, onClose, holding, mode = 'edit' }) => {
   const handleDelete = () => {
     if (!holding) return;
     dispatch({ type: 'REMOVE_HOLDING', payload: holding.id });
+    // Immediate save after manual delete
+    if (saveCriticalData) {
+      setTimeout(() => saveCriticalData('manual holding delete'), 100);
+    }
     onClose();
   };
 

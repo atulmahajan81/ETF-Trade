@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, DollarSign, CheckCircle, AlertCircle, LogIn, UserPlus } from 'lucide-react';
+import { User, DollarSign, CheckCircle, AlertCircle, LogIn, UserPlus, Shield, Key } from 'lucide-react';
 
 const UserSetup = ({ onComplete }) => {
   const [step, setStep] = useState(1);
@@ -12,10 +12,25 @@ const UserSetup = ({ onComplete }) => {
     tradingAmount: ''
   });
 
+  // Add broker credentials state
+  const [brokerCredentials, setBrokerCredentials] = useState({
+    mstocksUsername: '',
+    mstocksPassword: '',
+    mstocksApiKey: '',
+    enableRealTrading: false
+  });
+
   const [showFormatGuide, setShowFormatGuide] = useState(false);
 
   const handleInputChange = (field, value) => {
     setUserData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleBrokerCredentialChange = (field, value) => {
+    setBrokerCredentials(prev => ({
       ...prev,
       [field]: value
     }));
@@ -53,14 +68,15 @@ const UserSetup = ({ onComplete }) => {
       return;
     }
     
-    if (step < 5) {
+    if (step < 6) {
       setStep(step + 1);
     } else {
       // Calculate trading amount (initial capital / 50)
       const tradingAmount = Math.floor(parseFloat(userData.initialCapital) / 50);
       const finalUserData = {
         ...userData,
-        tradingAmount: tradingAmount.toString()
+        tradingAmount: tradingAmount.toString(),
+        brokerCredentials: brokerCredentials.enableRealTrading ? brokerCredentials : null
       };
       onComplete(finalUserData);
     }
@@ -70,6 +86,17 @@ const UserSetup = ({ onComplete }) => {
     if (step > 1) {
       setStep(step - 1);
     }
+  };
+
+  const handleSkipBrokerSetup = () => {
+    // Complete setup without broker credentials
+    const tradingAmount = Math.floor(parseFloat(userData.initialCapital) / 50);
+    const finalUserData = {
+      ...userData,
+      tradingAmount: tradingAmount.toString(),
+      brokerCredentials: null
+    };
+    onComplete(finalUserData);
   };
 
   const renderStep1 = () => (
@@ -219,32 +246,32 @@ const UserSetup = ({ onComplete }) => {
     <div className="space-y-6">
       <div className="text-center">
         <DollarSign className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900">Initial Capital Setup</h2>
-        <p className="text-gray-600 mt-2">Enter your initial trading capital</p>
+        <h2 className="text-2xl font-bold text-upstox-primary">Initial Capital Setup</h2>
+        <p className="text-upstox-secondary mt-2">Enter your initial trading capital</p>
       </div>
       
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-upstox-primary mb-2">
             Initial Capital (₹) *
           </label>
           <input
             type="number"
             value={userData.initialCapital}
             onChange={(e) => handleInputChange('initialCapital', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-upstox"
             placeholder="Enter amount in rupees"
             min="1000"
           />
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-upstox-secondary mt-1">
             Minimum recommended: ₹50,000
           </p>
         </div>
         
         {userData.initialCapital && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h3 className="font-medium text-green-900 mb-2">Trading Strategy</h3>
-            <div className="space-y-2 text-sm text-green-700">
+          <div className="p-4 card-upstox">
+            <h3 className="font-medium text-upstox-primary mb-2">Trading Strategy</h3>
+            <div className="space-y-2 text-sm text-upstox-secondary">
               <div>• Daily trading amount: ₹{Math.floor(parseFloat(userData.initialCapital) / 50).toLocaleString()}</div>
               <div>• Buy 1 ETF per day</div>
               <div>• Sell 1 ETF per day (when target reached)</div>
@@ -293,6 +320,85 @@ const UserSetup = ({ onComplete }) => {
             <div>• Compounding effect for better returns</div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+
+  const renderStep6 = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <Shield className="w-16 h-16 text-purple-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900">Broker Credentials (Optional)</h2>
+        <p className="text-gray-600 mt-2">
+          To enable real trading, please provide your MStocks credentials.
+          This is not required for demo purposes.
+        </p>
+      </div>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            MStocks Username *
+          </label>
+          <input
+            type="text"
+            value={brokerCredentials.mstocksUsername}
+            onChange={(e) => handleBrokerCredentialChange('mstocksUsername', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter your MStocks username"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            MStocks Password *
+          </label>
+          <input
+            type="password"
+            value={brokerCredentials.mstocksPassword}
+            onChange={(e) => handleBrokerCredentialChange('mstocksPassword', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter your MStocks password"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            MStocks API Key *
+          </label>
+          <input
+            type="text"
+            value={brokerCredentials.mstocksApiKey}
+            onChange={(e) => handleBrokerCredentialChange('mstocksApiKey', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter your MStocks API key"
+          />
+        </div>
+
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="enableRealTrading"
+            checked={brokerCredentials.enableRealTrading}
+            onChange={(e) => handleBrokerCredentialChange('enableRealTrading', e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="enableRealTrading" className="ml-2 text-sm text-gray-700">
+            Enable real trading with MStocks
+          </label>
+        </div>
+
+        {brokerCredentials.enableRealTrading && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="font-medium text-blue-900 mb-2">Important Notes</h3>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Never share your MStocks credentials with anyone.</li>
+              <li>• Keep your API key secure and confidential.</li>
+              <li>• If you lose your credentials, you will need to reset them.</li>
+              <li>• Real trading incurs real risks and potential losses.</li>
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -357,11 +463,12 @@ const UserSetup = ({ onComplete }) => {
     { title: 'User Info', component: renderStep2 },
     { title: 'Experience', component: renderStep3 },
     { title: 'Capital', component: renderStep4 },
-    { title: 'Review', component: renderStep5 }
+    { title: 'Review', component: renderStep5 },
+    { title: 'Broker Credentials', component: renderStep6 }
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-upstox-primary text-upstox-primary flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Progress Bar */}
         <div className="mb-8">
@@ -391,7 +498,7 @@ const UserSetup = ({ onComplete }) => {
         </div>
 
         {/* Step Content */}
-        <div className="bg-white rounded-lg shadow p-8">
+        <div className="card-upstox p-8">
           {steps[step - 1].component()}
         </div>
 
@@ -402,19 +509,30 @@ const UserSetup = ({ onComplete }) => {
             disabled={step === 1}
             className={`px-6 py-2 rounded-md transition-colors ${
               step === 1
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-500 text-white hover:bg-gray-600'
+                ? 'bg-upstox-tertiary text-upstox-secondary cursor-not-allowed'
+                : 'btn-upstox-secondary'
             }`}
           >
             Back
           </button>
           
-          <button
-            onClick={handleNext}
-            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-          >
-            {step === 5 ? 'Complete Setup' : 'Next'}
-          </button>
+          <div className="flex space-x-3">
+            {step === 6 && (
+              <button
+                onClick={handleSkipBrokerSetup}
+                className="btn-upstox-secondary"
+              >
+                Skip for Now
+              </button>
+            )}
+            
+            <button
+              onClick={handleNext}
+              className="btn-upstox-primary"
+            >
+              {step === 6 ? 'Complete Setup' : 'Next'}
+            </button>
+          </div>
         </div>
       </div>
 

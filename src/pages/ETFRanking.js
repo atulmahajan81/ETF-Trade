@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useETFTrading } from '../context/ETFTradingContext';
-import { Plus, TrendingDown, Filter, AlertCircle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Plus, TrendingDown, Filter, AlertCircle, CheckCircle, XCircle, RefreshCw, BarChart3 } from 'lucide-react';
+import mstocksApiService from '../services/mstocksApi';
+import TradingModal from '../components/TradingModal';
 
 const ETFRanking = () => {
   const { 
@@ -8,66 +10,101 @@ const ETFRanking = () => {
     holdings, 
     targetProfit, 
     averagingThreshold,
-    placeBuyOrder,
-    placeBuyOrderWithLifecycle,
     checkTradingEnabled,
     isTradingEnabled,
-    tradingStatus,
     tradingMessage,
-    updateETFsWithLivePrices,
-    updateETFsWithDMA20,
     getLastFetchedPrice,
-    getLastFetchInfo
+    dispatch
   } = useETFTrading();
-  const [showBuyModal, setShowBuyModal] = useState(false);
+  
+
+  
+  const [showTradingModal, setShowTradingModal] = useState(false);
   const [selectedETF, setSelectedETF] = useState(null);
   const [filterSector, setFilterSector] = useState('all');
-  const [orderType, setOrderType] = useState('MARKET'); // MARKET, LIMIT
-  const [limitPrice, setLimitPrice] = useState('');
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
   const [priceUpdateMessage, setPriceUpdateMessage] = useState('');
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  const [sessionStatus, setSessionStatus] = useState(null);
+
 
   // Check trading enabled on mount
   useEffect(() => {
     checkTradingEnabled();
+    loadSessionStatus();
   }, [checkTradingEnabled]);
 
-  // Auto-refresh every 5 minutes
+  // Load session status
+  const loadSessionStatus = async () => {
+    try {
+      const status = mstocksApiService.getSessionStatus();
+      setSessionStatus(status);
+    } catch (error) {
+      setSessionStatus({ logged_in: false, message: 'Session status unavailable' });
+    }
+  };
+
+  // Auto-refresh every 5 minutes - only during market hours
   useEffect(() => {
     if (!autoRefreshEnabled) return;
 
     const refreshInterval = setInterval(async () => {
-      console.log('🔄 Auto-refreshing ETF prices and DMA20...');
-      await handleUpdateETFsComplete();
-      setLastRefreshTime(new Date());
+      // Guard: only fetch during market hours and when session is valid
+      try {
+        const s = mstocksApiService.getSessionStatus();
+        if (s?.session_valid && isMarketOpen()) {
+          await handleUpdateETFsComplete();
+          setLastRefreshTime(new Date());
+        }
+      } catch (e) {
+        // Session status not available, skip refresh
+      }
     }, 5 * 60 * 1000); // 5 minutes
 
-    // Initial refresh on mount
-    handleUpdateETFsComplete();
-    setLastRefreshTime(new Date());
+    // Initial refresh on mount (run regardless of market hours)
+    (async () => {
+      try {
+        const s = mstocksApiService.getSessionStatus();
+        if (s?.session_valid) {
+          await handleUpdateETFsComplete();
+          setLastRefreshTime(new Date());
+        }
+      } catch {}
+    })();
 
     return () => clearInterval(refreshInterval);
   }, [autoRefreshEnabled]);
 
-  // Calculate percentage difference and rank ETFs
-  const rankedETFs = etfs
-    .map(etf => {
-      const percentDiff = ((etf.cmp - etf.dma20) / etf.dma20) * 100;
-      const isHolding = holdings.some(h => h.symbol === etf.symbol);
-      return {
+  // Calculate percentage difference and rank ETFs - use useMemo to recalculate when etfs change
+  const rankedETFs = useMemo(() => {
+    return etfs
+      .map(etf => {
+        const cmp = Number(etf.cmp ?? etf.currentPrice ?? 0);
+        const dma = Number(etf.dma20 ?? 0);
+        const percentDiff = dma > 0 && cmp > 0 ? ((cmp - dma) / dma) * 100 : 0;
+        const isHolding = holdings.some(h => h.symbol === etf.symbol);
+        return {
+          ...etf,
+          cmp,
+          dma20: dma,
+          percentDiff,
+          isHolding,
+          rank: 0
+        };
+      })
+      .sort((a, b) => {
+        // First sort by whether it's in holdings (holdings go to bottom)
+        if (a.isHolding && !b.isHolding) return 1;
+        if (!a.isHolding && b.isHolding) return -1;
+        // Then sort by percentage difference (most fallen first)
+        return a.percentDiff - b.percentDiff;
+      })
+      .map((etf, index) => ({
         ...etf,
-        percentDiff,
-        isHolding,
-        rank: 0
-      };
-    })
-    .sort((a, b) => a.percentDiff - b.percentDiff) // Sort by lowest to highest (most fallen first)
-    .map((etf, index) => ({
-      ...etf,
-      rank: index + 1
-    }));
+        rank: index + 1
+      }));
+  }, [etfs, holdings]);
 
   // Filter ETFs by sector
   const filteredETFs = filterSector === 'all' 
@@ -91,562 +128,512 @@ const ETFRanking = () => {
 
   const handleBuyClick = (etf) => {
     setSelectedETF(etf);
-    setShowBuyModal(true);
+    setShowTradingModal(true);
   };
 
-  const handleBuy = async (quantity, price) => {
-    try {
-      if (!isTradingEnabled) {
-        alert('Trading is not enabled. Please configure your MStocks API credentials.');
-        return;
-      }
-
-      const orderData = {
-        symbol: selectedETF.symbol,
-        quantity: parseInt(quantity),
-        price: orderType === 'MARKET' ? 0 : parseFloat(price),
-        orderType: orderType,
-        productType: 'CNC', // Cash and Carry
-        validity: 'DAY'
-      };
-
-      await placeBuyOrderWithLifecycle(orderData);
-      setShowBuyModal(false);
-      setSelectedETF(null);
-      setOrderType('MARKET');
-      setLimitPrice('');
-    } catch (error) {
-      console.error('Error placing buy order:', error);
-      alert(`Error placing order: ${error.message}`);
-    }
+  const handleCloseTradingModal = () => {
+    setShowTradingModal(false);
+    setSelectedETF(null);
   };
 
   // Update ETF prices with live data
-  const handleUpdateETFPrices = async () => {
+  const handleUpdateETFPrices = useCallback(async () => {
     setIsUpdatingPrices(true);
     setPriceUpdateMessage('');
     
     try {
-      console.log('🔄 Updating ETF prices with live data...');
-      await updateETFsWithLivePrices();
-      setPriceUpdateMessage('✅ ETF prices updated successfully with live market data!');
+      let updatedETFs = [...etfs];
+      let successCount = 0;
+      let errorCount = 0;
+      let dataSource = '';
+
+      // Ensure session is fresh but do not gate the fetch on this
+      try { await mstocksApiService.autoRefreshSession?.(); } catch {}
+      
+      // Process each ETF to fetch live price
+      for (let i = 0; i < updatedETFs.length; i++) {
+        const etf = updatedETFs[i];
+        
+        try {
+          // Extract symbol without NSE: prefix if present
+          const cleanSymbol = etf.symbol.replace('NSE:', '').replace('BSE:', '');
+          
+          let newPrice = null;
+          let newVolume = null;
+          
+          // Always try MStocks live price for each symbol
+          try {
+            const priceData = await mstocksApiService.getLivePrice(etf.symbol);
+            const ltp = Number(
+              priceData?.data?.price ??
+              priceData?.lastPrice ??
+              priceData?.price ??
+              priceData?.data?.ltp ??
+              0
+            );
+            if (ltp > 0) {
+              newPrice = ltp;
+              dataSource = priceData?.data?.source || priceData?.source || 'MStocks API';
+              const vol = priceData?.data?.volume ?? priceData?.volume;
+              if (typeof vol !== 'undefined') newVolume = Number(vol);
+            }
+          } catch {}
+          
+          // Update ETF if we got a valid price
+          if (newPrice && !isNaN(newPrice) && newPrice > 0) {
+            etf.cmp = newPrice;
+            etf.currentPrice = newPrice;
+            etf.lastUpdated = new Date().toISOString();
+            etf.dataSource = dataSource;
+            if (newVolume !== null && Number.isFinite(newVolume) && newVolume >= 0) {
+              etf.volume = newVolume;
+            }
+            successCount++;
+          } else {
+            errorCount++;
+          }
+          
+          // Add small delay to avoid overwhelming the APIs
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+        } catch (error) {
+          errorCount++;
+        }
+      }
+      
+      // Update context state with new ETF prices
+      updatedETFs.forEach(etf => {
+        dispatch({ type: 'UPDATE_ETF', payload: etf });
+      });
+      
+      const marketStatus = isMarketOpen() ? 'Live prices' : 'Latest available data';
+      const apiStatus = 'MStocks API';
+      const message = `${marketStatus} updated via ${apiStatus}! (${successCount} success, ${errorCount} failed)`;
+      setPriceUpdateMessage(message);
       setTimeout(() => setPriceUpdateMessage(''), 5000);
+      
     } catch (error) {
-      console.error('❌ Error updating ETF prices:', error);
-      setPriceUpdateMessage('❌ Failed to update ETF prices. Please try again.');
-      setTimeout(() => setPriceUpdateMessage(''), 5000);
+      setPriceUpdateMessage('Error updating ETF prices. Please try again.');
+      setTimeout(() => setPriceUpdateMessage(''), 3000);
     } finally {
       setIsUpdatingPrices(false);
     }
-  };
+  }, [etfs, dispatch]);
 
-  // Check broker connection status
-  const checkBrokerConnection = async () => {
+  // Calculate 20 DMA using broker historical data via service
+  const calculateDMA20 = useCallback(async (symbol, expectedLtp = null) => {
     try {
-      // Test Python API connection
-      const pythonApiStatus = await fetch('http://localhost:5000/api/health');
-      if (pythonApiStatus.ok) {
-        const statusData = await pythonApiStatus.json();
-        return statusData.logged_in || false;
+      const res = await mstocksApiService.calculateDMA20(symbol, expectedLtp);
+      if (res && res.status === 'success' && res.data && typeof res.data.dma20 !== 'undefined') {
+        return Number(res.data.dma20);
       }
-      return false;
-    } catch (error) {
-      console.warn('⚠️ Python API not available:', error.message);
-      return false;
+      return null;
+    } catch (e) {
+      return null;
     }
-  };
+  }, []);
 
   // Update ETF prices and DMA20 with live data
-  const handleUpdateETFsComplete = async () => {
+  const handleUpdateETFsComplete = useCallback(async () => {
     setIsUpdatingPrices(true);
     setPriceUpdateMessage('');
     
     try {
-      console.log('🔄 Updating ETF prices and DMA20 with live data...');
+      // Update prices first
+      await handleUpdateETFPrices();
       
-      // Check broker connection first
-      const isBrokerConnected = await checkBrokerConnection();
+      // Then update DMA20 for each ETF
+      let dmaSuccessCount = 0;
+      let dmaErrorCount = 0;
       
-      if (!isBrokerConnected) {
-        console.log('⚠️ Broker not connected, showing last fetched data');
-        setPriceUpdateMessage('⚠️ Broker not connected. Showing last fetched data. Please connect your broker for live updates.');
-        setTimeout(() => setPriceUpdateMessage(''), 5000);
-        setIsUpdatingPrices(false);
-        return;
+       for (const etf of etfs) {
+        try {
+          const cmp = Number(etf.cmp ?? etf.currentPrice ?? 0);
+          const dma20 = await calculateDMA20(etf.symbol, Number.isFinite(cmp) && cmp > 0 ? cmp : null);
+          if (typeof dma20 === 'number' && Number.isFinite(dma20) && dma20 > 0) {
+            const updatedETF = { ...etf, dma20: Number(dma20.toFixed(2)) };
+            dispatch({ type: 'UPDATE_ETF', payload: updatedETF });
+            dmaSuccessCount++;
+          } else {
+            dmaErrorCount++;
+          }
+          
+          // Small stagger to avoid bursts
+          await new Promise(resolve => setTimeout(resolve, 150));
+        } catch (error) {
+          dmaErrorCount++;
+        }
       }
       
-      // Update prices first
-      await updateETFsWithLivePrices();
+      // Refresh session status
+      await loadSessionStatus();
       
-      // Then update DMA20
-      await updateETFsWithDMA20();
-      
-      setPriceUpdateMessage('✅ ETF prices and DMA20 updated successfully with live market data!');
+      setPriceUpdateMessage(`✅ ETF prices and DMA20 updated! (${dmaSuccessCount} DMA success, ${dmaErrorCount} DMA failed)`);
       setTimeout(() => setPriceUpdateMessage(''), 5000);
     } catch (error) {
-      console.error('❌ Error updating ETF data:', error);
       setPriceUpdateMessage('❌ Failed to update ETF data. Please try again.');
       setTimeout(() => setPriceUpdateMessage(''), 5000);
     } finally {
       setIsUpdatingPrices(false);
     }
+  }, [etfs, handleUpdateETFPrices, calculateDMA20, dispatch]);
+
+  // Helper function to check if market is open (IST hours only)
+  const isMarketOpen = () => {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(now);
+    const get = (t) => parts.find(p => p.type === t)?.value;
+    const weekday = get('weekday'); // e.g., Mon, Tue
+    const hour = Number(get('hour'));
+    const minute = Number(get('minute'));
+    const isWeekday = weekday && !['Sat','Sun'].includes(weekday);
+    const currentTime = hour * 100 + minute; // HHMM
+    const isMarketHours = currentTime >= 915 && currentTime <= 1530;
+    return Boolean(isWeekday && isMarketHours);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">ETF Ranking</h1>
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={handleUpdateETFPrices}
-            disabled={isUpdatingPrices}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isUpdatingPrices ? 'animate-spin' : ''}`} />
-            {isUpdatingPrices ? 'Updating Prices...' : 'Update Prices Only'}
-          </button>
-          <button
-            onClick={handleUpdateETFsComplete}
-            disabled={isUpdatingPrices}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isUpdatingPrices ? 'animate-spin' : ''}`} />
-            {isUpdatingPrices ? 'Updating All Data...' : 'Update Prices + DMA20'}
-          </button>
-          <button
-            onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md ${
-              autoRefreshEnabled 
-                ? 'text-white bg-blue-600 hover:bg-blue-700' 
-                : 'text-gray-700 bg-gray-200 hover:bg-gray-300'
-            }`}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            {autoRefreshEnabled ? 'Auto-Refresh ON' : 'Auto-Refresh OFF'}
-          </button>
-          <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <select
-              value={filterSector}
-              onChange={(e) => setFilterSector(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-            >
-              {sectors.map(sector => (
-                <option key={sector} value={sector}>
-                  {sector === 'all' ? 'All Sectors' : sector}
-                </option>
-              ))}
-            </select>
+    <div className="min-h-screen bg-upstox-primary text-upstox-primary">
+      {/* Header */}
+      <div className="bg-upstox-secondary border-b border-upstox-primary">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-accent-blue to-accent-blue-light rounded-lg flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-upstox-primary">ETF Ranking</h1>
+                  <p className="text-sm text-upstox-secondary">Analyze and rank ETFs based on their performance relative to 20-day moving average</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Data Source Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Auto-Refresh Status */}
-        <div className={`p-4 rounded-md ${
-          autoRefreshEnabled ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <RefreshCw className={`w-5 h-5 mr-2 ${autoRefreshEnabled ? 'text-blue-600' : 'text-gray-500'}`} />
-              <div>
-                <span className={`text-sm font-medium ${
-                  autoRefreshEnabled ? 'text-blue-800' : 'text-gray-700'
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* API Connection Status */}
+        <div className="card-upstox overflow-hidden">
+          <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`flex items-center gap-2 ${
+                  sessionStatus?.logged_in ? 'text-positive' : 'text-upstox-secondary'
                 }`}>
-                  Auto-Refresh: {autoRefreshEnabled ? 'ON' : 'OFF'}
+                  <div className={`w-3 h-3 rounded-full ${sessionStatus?.logged_in ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                  <span className="text-sm font-medium">
+                    {sessionStatus?.logged_in ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+                <span className="text-sm text-upstox-secondary">
+                  {lastRefreshTime ? `Last updated: ${new Date(lastRefreshTime).toLocaleTimeString()}` : 'No updates yet'}
                 </span>
-                {autoRefreshEnabled && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    Refreshing every 5 minutes automatically
-                  </p>
-                )}
               </div>
             </div>
-            {lastRefreshTime && (
-              <div className="text-xs text-gray-500">
-                Last refresh: {lastRefreshTime.toLocaleTimeString()}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Last Fetched Data Status */}
-        <div className="p-4 rounded-md bg-green-50 border border-green-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-5 h-5 mr-2 bg-green-500 rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+        {/* Controls */}
+        <div className="card-upstox overflow-hidden">
+          <div className="px-6 py-4 border-b border-upstox-primary bg-upstox-tertiary">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-upstox-elevated rounded-lg">
+                  <Filter className="h-5 w-5 text-upstox-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-upstox-primary">Controls</h2>
+                  <p className="text-sm text-upstox-secondary">Manage price updates and filtering</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleUpdateETFPrices}
+                  disabled={isUpdatingPrices || !isMarketOpen()}
+                  className="btn-upstox-success disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!isMarketOpen() ? 'Market is closed - prices will not update' : ''}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isUpdatingPrices ? 'animate-spin' : ''}`} />
+                  {isUpdatingPrices ? 'Updating Prices...' : 'Update Prices Only'}
+                </button>
+
+                <button
+                  onClick={handleUpdateETFsComplete}
+                  disabled={isUpdatingPrices || !isMarketOpen()}
+                  className="btn-upstox-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!isMarketOpen() ? 'Market is closed - data will not update' : ''}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isUpdatingPrices ? 'animate-spin' : ''}`} />
+                  {isUpdatingPrices ? 'Updating All Data...' : 'Update Prices + DMA20'}
+                </button>
+
+                <button
+                  onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                  className={`btn-upstox-secondary ${autoRefreshEnabled ? 'bg-accent-blue text-white hover:bg-accent-blue-hover' : ''}`}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {autoRefreshEnabled ? 'Auto-Refresh ON' : 'Auto-Refresh OFF'}
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-upstox-secondary" />
+                  <select
+                    value={filterSector}
+                    onChange={(e) => setFilterSector(e.target.value)}
+                    className="input-upstox text-sm"
+                  >
+                    {sectors.map(sector => (
+                      <option key={sector} value={sector}>
+                        {sector === 'all' ? 'All Sectors' : sector}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Market Status Indicator */}
+        <div className="card-upstox overflow-hidden">
+          <div className="px-6 py-4 bg-upstox-tertiary border-b border-upstox-primary">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                {isMarketOpen() ? (
+                  <CheckCircle className="w-5 h-5 text-positive mr-2" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-upstox-secondary mr-2" />
+                )}
+                <span className="text-sm font-medium text-upstox-primary">
+                  Market Status: {isMarketOpen() ? 'OPEN' : 'CLOSED'}
+                </span>
+              </div>
+                <div className="text-right">
+                  <span className="text-xs text-upstox-secondary">
+                    {isMarketOpen() ? 'Live prices available' : 'Showing last available data'}
+                  </span>
+                  <div className="text-xs text-upstox-secondary mt-1">
+                    {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', timeStyle: 'medium' }).format(new Date())}
+                  </div>
+                </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Messages */}
+        {priceUpdateMessage && (
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 bg-upstox-tertiary border-b border-upstox-primary">
+              <div className="flex items-center">
+                {priceUpdateMessage.includes('✅') ? (
+                  <CheckCircle className="w-5 h-5 text-positive mr-2" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-negative mr-2" />
+                )}
+                <span className="text-sm font-medium text-upstox-primary">
+                  {priceUpdateMessage}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Trading Status */}
+        {!isTradingEnabled && (
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 bg-upstox-tertiary border-b border-upstox-primary">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-upstox-secondary mr-2" />
+                <div>
+                  <h3 className="text-sm font-medium text-upstox-primary">Trading Disabled</h3>
+                  <p className="text-sm text-upstox-secondary">
+                    {tradingMessage || 'Please configure your MStocks API credentials to enable trading.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Strategy Summary */}
+        <div className="card-upstox overflow-hidden">
+          <div className="px-6 py-4 bg-upstox-tertiary border-b border-upstox-primary">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6 text-sm">
+                <span className="font-medium text-upstox-primary">Target Profit: <span className="text-accent-blue">{targetProfit}%</span></span>
+                <span className="font-medium text-upstox-primary">Averaging: <span className="text-accent-blue">{averagingThreshold}%</span></span>
+                <span className="font-medium text-upstox-primary">Available: <span className="text-accent-blue">{newETFs.length} ETFs</span></span>
+              </div>
+              <span className="text-sm text-upstox-secondary">Ranked by % below 20 DMA</span>
+            </div>
+          </div>
+        </div>
+
+        {/* All ETFs Section */}
+        <div className="card-upstox overflow-hidden">
+          <div className="px-6 py-4 bg-upstox-tertiary border-b border-upstox-primary">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-upstox-elevated rounded-lg">
+                <BarChart3 className="h-5 w-5 text-upstox-primary" />
               </div>
               <div>
-                <span className="text-sm font-medium text-green-800">
-                  Data Source: {getLastFetchInfo().hasOfflineData ? 'Last Fetched' : 'No Data'}
-                </span>
-                {getLastFetchInfo().hasOfflineData && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {getLastFetchInfo().source || 'Unknown Source'}
-                  </p>
-                )}
+                <h2 className="text-lg font-semibold text-upstox-primary">ETF Ranking</h2>
+                <p className="text-sm text-upstox-secondary">ETFs ranked by % below 20 DMA. Holdings shown at bottom.</p>
               </div>
             </div>
-            {getLastFetchInfo().timestamp && (
-              <div className="text-xs text-gray-500">
-                {new Date(getLastFetchInfo().timestamp).toLocaleString()}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Price Update Status Message */}
-      {priceUpdateMessage && (
-        <div className={`p-4 rounded-md mb-4 ${
-          priceUpdateMessage.includes('✅') 
-            ? 'bg-green-50 border border-green-200' 
-            : 'bg-red-50 border border-red-200'
-        }`}>
-          <div className="flex items-center">
-            {priceUpdateMessage.includes('✅') ? (
-              <CheckCircle className="w-5 h-5 text-green-400 mr-2" />
-            ) : (
-              <XCircle className="w-5 h-5 text-red-400 mr-2" />
-            )}
-            <span className={`text-sm font-medium ${
-              priceUpdateMessage.includes('✅') ? 'text-green-800' : 'text-red-800'
-            }`}>
-              {priceUpdateMessage}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Trading Status Banner */}
-      {tradingStatus !== 'idle' && (
-        <div className={`rounded-lg p-4 ${
-          tradingStatus === 'success' ? 'bg-green-50 border border-green-200' :
-          tradingStatus === 'error' ? 'bg-red-50 border border-red-200' :
-          tradingStatus === 'loading' ? 'bg-blue-50 border border-blue-200' :
-          'bg-gray-50 border border-gray-200'
-        }`}>
-          <div className="flex items-center">
-            {tradingStatus === 'success' && <CheckCircle className="w-5 h-5 text-green-600 mr-2" />}
-            {tradingStatus === 'error' && <XCircle className="w-5 h-5 text-red-600 mr-2" />}
-            {tradingStatus === 'loading' && <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>}
-            <div>
-              <h3 className={`text-sm font-medium ${
-                tradingStatus === 'success' ? 'text-green-800' :
-                tradingStatus === 'error' ? 'text-red-800' :
-                tradingStatus === 'loading' ? 'text-blue-800' :
-                'text-gray-800'
-              }`}>
-                {tradingStatus === 'success' ? 'Order Placed Successfully' :
-                 tradingStatus === 'error' ? 'Order Failed' :
-                 tradingStatus === 'loading' ? 'Processing Order' :
-                 'Trading Status'}
-              </h3>
-              <p className={`text-sm ${
-                tradingStatus === 'success' ? 'text-green-700' :
-                tradingStatus === 'error' ? 'text-red-700' :
-                tradingStatus === 'loading' ? 'text-blue-700' :
-                'text-gray-700'
-              }`}>
-                {typeof tradingMessage === 'string' ? tradingMessage : JSON.stringify(tradingMessage)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Trading API Status */}
-      <div className={`rounded-lg p-4 ${
-        isTradingEnabled ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
-      }`}>
-        <div className="flex items-center">
-          {isTradingEnabled ? (
-            <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
-          )}
-          <div>
-            <h3 className={`text-sm font-medium ${
-              isTradingEnabled ? 'text-green-800' : 'text-yellow-800'
-            }`}>
-              {isTradingEnabled ? 'Trading Enabled' : 'Trading Disabled'}
-            </h3>
-            <p className={`text-sm ${
-              isTradingEnabled ? 'text-green-700' : 'text-yellow-700'
-            }`}>
-              {isTradingEnabled 
-                ? 'MStocks API is configured. You can place real orders.'
-                : 'MStocks API is not configured. Please set up your API credentials to enable trading.'
-              }
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Data Source Notice */}
-      {getLastFetchInfo().hasOfflineData ? (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800">📊 Showing Last Fetched Data</h3>
-              <p className="text-sm text-yellow-700">
-                Broker is not connected. Displaying prices from last successful fetch: {getLastFetchInfo().source}
-              </p>
-              <p className="text-sm text-yellow-600 mt-1">
-                Last updated: {getLastFetchInfo().timestamp ? new Date(getLastFetchInfo().timestamp).toLocaleString() : 'Unknown'}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <CheckCircle className="w-5 h-5 text-blue-600 mr-2" />
-            <div>
-              <h3 className="text-sm font-medium text-blue-800">🔄 Live API Mode Active</h3>
-              <p className="text-sm text-blue-700">
-                Using username/password/OTP authentication for MStocks API. 
-                Please configure your credentials in src/services/mstocksApi.js
-              </p>
-              <p className="text-sm text-blue-600 mt-1">
-                If API endpoints are not responding, prices will be simulated for testing.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Strategy Summary */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h2 className="text-lg font-semibold text-blue-900 mb-2">Strategy Summary</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="font-medium">Target Profit:</span> {targetProfit}%
-          </div>
-          <div>
-            <span className="font-medium">Averaging Threshold:</span> {averagingThreshold}%
-          </div>
-          <div>
-            <span className="font-medium">Ranking Method:</span> % below 20 DMA
-          </div>
-        </div>
-      </div>
-
-      {/* New ETFs Section */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">New ETFs to Buy</h2>
-          <p className="text-sm text-gray-600 mt-1">ETFs not currently in your portfolio, ranked by % below 20 DMA</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CMP</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">20 DMA</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Below DMA</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Volume</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {newETFs.slice(0, 5).map((etf) => (
-                <tr key={etf.symbol} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      #{etf.rank}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{etf.symbol}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{etf.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <span>₹{etf.cmp}</span>
-                      {getLastFetchedPrice(etf.symbol)?.isOffline && (
-                        <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                          Offline
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{etf.dma20}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
-                    <TrendingDown className="inline w-4 h-4 mr-1" />
-                    {Math.abs(etf.percentDiff).toFixed(2)}%
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{etf.volume.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() => handleBuyClick(etf)}
-                      className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Buy
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Existing ETFs for Averaging */}
-      {existingETFsForAveraging.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Existing ETFs for Averaging</h2>
-            <p className="text-sm text-gray-600 mt-1">ETFs that have fallen more than {averagingThreshold}% from last purchase price</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="table-upstox">
+              <thead className="bg-upstox-tertiary">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CMP</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Purchase</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Fall</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Rank</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Symbol</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">CMP</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">20 DMA</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">% Below DMA</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Volume</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {existingETFsForAveraging.map((etf) => {
-                  const holding = holdings.find(h => h.symbol === etf.symbol);
-                  const fallPercent = ((holding.lastPurchasePrice - etf.cmp) / holding.lastPurchasePrice) * 100;
-                  
-                  return (
-                    <tr key={etf.symbol} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{etf.symbol}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{etf.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex items-center">
-                          <span>₹{etf.cmp}</span>
-                          {getLastFetchedPrice(etf.symbol)?.isOffline && (
-                            <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                              Offline
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{holding.lastPurchasePrice}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
-                        <TrendingDown className="inline w-4 h-4 mr-1" />
-                        {fallPercent.toFixed(2)}%
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+              <tbody className="bg-upstox-secondary divide-y divide-upstox-primary">
+                {filteredETFs.map((etf) => (
+                  <tr key={etf.symbol} className={`hover:bg-upstox-tertiary ${etf.isHolding ? 'bg-upstox-tertiary' : ''}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        etf.isHolding 
+                          ? 'bg-neutral-100 text-neutral-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        #{etf.rank}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-upstox-primary">{etf.symbol}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-secondary">{etf.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">
+                      <div className="flex items-center">
+                        <span>₹{etf.cmp}</span>
+                        {getLastFetchedPrice(etf.symbol)?.isOffline && (
+                          <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                            Offline
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">₹{Number(etf.dma20 ?? 0).toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
+                      <TrendingDown className="inline w-4 h-4 mr-1" />
+                      {Math.abs(etf.percentDiff).toFixed(2)}%
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">{etf.volume.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {etf.isHolding ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          In Holdings
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          Available
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {etf.isHolding ? (
+                        <span className="text-upstox-secondary text-xs">Already Owned</span>
+                      ) : (
                         <button
                           onClick={() => handleBuyClick(etf)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
+                          className="btn-upstox-success text-xs px-3 py-1"
                         >
                           <Plus className="w-3 h-3 mr-1" />
-                          Average
+                          Buy
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-      )}
 
-      {/* Buy Modal */}
-      {showBuyModal && selectedETF && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Buy {selectedETF.symbol}</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Order Type</label>
-                  <select
-                    value={orderType}
-                    onChange={(e) => setOrderType(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                  >
-                    <option value="MARKET">Market Order</option>
-                    <option value="LIMIT">Limit Order</option>
-                  </select>
+        {/* Existing ETFs for Averaging */}
+        {existingETFsForAveraging.length > 0 && (
+          <div className="card-upstox overflow-hidden">
+            <div className="px-6 py-4 bg-upstox-tertiary border-b border-upstox-primary">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-upstox-elevated rounded-lg">
+                  <Plus className="h-5 w-5 text-upstox-primary" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                  <input
-                    type="number"
-                    id="quantity"
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Enter quantity"
-                    min="1"
-                  />
-                </div>
-                {orderType === 'LIMIT' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Limit Price</label>
-                    <input
-                      type="number"
-                      value={limitPrice}
-                      onChange={(e) => setLimitPrice(e.target.value)}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                      placeholder="Enter limit price"
-                      step="0.01"
-                      defaultValue={selectedETF.cmp}
-                    />
-                  </div>
-                )}
-                <div className="bg-gray-50 p-3 rounded-md">
-                  <p className="text-sm text-gray-600">
-                    <strong>Current Price:</strong> ₹{selectedETF.cmp}<br/>
-                    <strong>Order Type:</strong> {orderType}<br/>
-                    {orderType === 'LIMIT' && limitPrice && (
-                      <span className="text-blue-600">
-                        <strong>Limit Price:</strong> ₹{limitPrice}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowBuyModal(false);
-                      setOrderType('MARKET');
-                      setLimitPrice('');
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      const quantity = document.getElementById('quantity').value;
-                      if (quantity) {
-                        const price = orderType === 'LIMIT' ? limitPrice : selectedETF.cmp;
-                        handleBuy(quantity, price);
-                      } else {
-                        alert('Please enter quantity');
-                      }
-                    }}
-                    disabled={!isTradingEnabled}
-                    className={`px-4 py-2 text-sm font-medium rounded-md ${
-                      isTradingEnabled 
-                        ? 'text-white bg-green-600 hover:bg-green-700' 
-                        : 'text-gray-400 bg-gray-300 cursor-not-allowed'
-                    }`}
-                  >
-                    {isTradingEnabled ? 'Place Buy Order' : 'Trading Disabled'}
-                  </button>
+                  <h2 className="text-lg font-semibold text-upstox-primary">Existing ETFs Ready for Averaging</h2>
+                  <p className="text-sm text-upstox-secondary">ETFs in your portfolio that have fallen {averagingThreshold}% or more below your last purchase price</p>
                 </div>
               </div>
             </div>
+            <div className="overflow-x-auto">
+              <table className="table-upstox">
+                <thead className="bg-upstox-tertiary">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Symbol</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">CMP</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Last Purchase</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">% Fall</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-upstox-secondary uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-upstox-secondary divide-y divide-upstox-primary">
+                  {existingETFsForAveraging.map((etf) => {
+                    const holding = holdings.find(h => h.symbol === etf.symbol);
+                    const fallPercent = ((holding.lastPurchasePrice - etf.cmp) / holding.lastPurchasePrice) * 100;
+                    
+                    return (
+                      <tr key={etf.symbol} className="hover:bg-upstox-tertiary">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-upstox-primary">{etf.symbol}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-secondary">{etf.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">₹{etf.cmp}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">₹{holding.lastPurchasePrice}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
+                          <TrendingDown className="inline w-4 h-4 mr-1" />
+                          {fallPercent.toFixed(2)}%
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <button
+                            onClick={() => handleBuyClick(etf)}
+                            className="btn-upstox-primary text-xs px-3 py-1"
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Average
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Trading Modal */}
+        <TradingModal
+          isOpen={showTradingModal}
+          onClose={handleCloseTradingModal}
+          mode="buy"
+          selectedItem={selectedETF}
+        />
+      </div>
     </div>
   );
 };
