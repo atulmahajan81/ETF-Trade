@@ -8,6 +8,59 @@ import { sampleSoldItems } from '../data/complete_sold_items.js';
 // Development environment detection
 const IS_LOCAL_DEV = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+// Helper function to calculate next buy amount based on trading performance and available capital
+const calculateNextBuyAmount = (baseTradingAmount, availableCapital, recentProfits = [], soldItems = []) => {
+  if (!baseTradingAmount || baseTradingAmount <= 0) return 0;
+  if (availableCapital <= 0) return 0;
+  
+  // Calculate overall trading performance
+  const totalTrades = soldItems.length;
+  const profitableTrades = soldItems.filter(s => Number(s.profit || s.profitLoss || 0) > 0).length;
+  const successRate = totalTrades > 0 ? (profitableTrades / totalTrades) * 100 : 0;
+  
+  // Calculate recent performance (last 5 trades)
+  const recentProfitSum = recentProfits.slice(0, 5).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const averageRecentProfit = recentProfits.length > 0 ? recentProfitSum / Math.min(recentProfits.length, 5) : 0;
+  
+  // Start with base trading amount
+  let nextBuyAmount = baseTradingAmount;
+  
+  // Adjust based on success rate
+  if (successRate >= 90) {
+    // Excellent performance (90%+) - increase by 50%
+    nextBuyAmount = baseTradingAmount * 1.5;
+  } else if (successRate >= 80) {
+    // High performance (80-89%) - increase by 25%
+    nextBuyAmount = baseTradingAmount * 1.25;
+  } else if (successRate >= 70) {
+    // Good performance (70-79%) - increase by 10%
+    nextBuyAmount = baseTradingAmount * 1.1;
+  } else if (successRate >= 60) {
+    // Average performance (60-69%) - keep base amount
+    nextBuyAmount = baseTradingAmount;
+  } else if (successRate >= 40) {
+    // Below average (40-59%) - reduce by 10%
+    nextBuyAmount = baseTradingAmount * 0.9;
+  } else {
+    // Poor performance (<40%) - reduce by 25%
+    nextBuyAmount = baseTradingAmount * 0.75;
+  }
+  
+  // Adjust based on recent performance
+  if (averageRecentProfit > 0 && recentProfits.length > 0) {
+    const recentPerformanceMultiplier = Math.min(1 + (averageRecentProfit / baseTradingAmount * 0.5), 1.3);
+    nextBuyAmount *= recentPerformanceMultiplier;
+  }
+  
+  // Ensure we don't exceed available capital
+  nextBuyAmount = Math.min(nextBuyAmount, availableCapital);
+  
+  // Ensure minimum amount for trading
+  nextBuyAmount = Math.max(nextBuyAmount, Math.min(baseTradingAmount * 0.5, availableCapital));
+  
+  return Math.round(nextBuyAmount);
+};
+
 // Helper function to calculate compounding effect based on trading performance
 const calculateCompoundingEffect = (nextBuyAmount, baseTradingAmount, recentProfits = [], soldItems = []) => {
   if (!baseTradingAmount || baseTradingAmount <= 0) return 0;
@@ -446,8 +499,8 @@ const etfTradingReducer = (state, action) => {
         // Traditional money management system
         const newAvailableCapital = Number(state.moneyManagement.availableCapital || 0) + (isNaN(bookedProfit) ? 0 : bookedProfit);
         const baseChunk = Number(state.userSetup?.tradingAmount || 0);
-        // Fix: Don't add total booked profit to next buy amount - this causes incorrect compounding effect
-        const newNextBuyAmount = baseChunk;
+        // Calculate next buy amount based on trading performance and available capital
+        const newNextBuyAmount = calculateNextBuyAmount(baseChunk, newAvailableCapital, updatedRecent, state.soldItems);
 
         newState.moneyManagement = {
           ...state.moneyManagement,
@@ -1473,7 +1526,7 @@ export const ETFTradingProvider = ({ children }) => {
                   const investedAmount = holdings.reduce((sum, h) => sum + ((h.avgPrice || h.buyPrice || 0) * (h.quantity || 0)), 0);
                   const bookedProfit = soldItems.reduce((sum, s) => sum + (Number(s.profit ?? s.profitLoss ?? 0)), 0);
                   const availableCapital = Math.max(0, initialCapital - investedAmount + bookedProfit);
-                  const nextBuyAmount = Math.min(availableCapital, tradingAmount);
+                  const nextBuyAmount = calculateNextBuyAmount(tradingAmount, availableCapital, userData.moneyManagement?.recentProfits || [], soldItems);
                   
                   // Calculate compounding effect based on trading performance
                   const recentProfits = userData.moneyManagement?.recentProfits || [];
@@ -1492,11 +1545,18 @@ export const ETFTradingProvider = ({ children }) => {
                     payload: updatedMoneyManagement 
                   });
                   
-                  console.log('✅ Compounding effect recalculated on data load:', {
+                  const successRate = soldItems.length > 0 ? ((soldItems.filter(s => Number(s.profit || s.profitLoss || 0) > 0).length / soldItems.length) * 100) : 0;
+                  const baseTradingAmount = tradingAmount;
+                  const performanceMultiplier = nextBuyAmount / baseTradingAmount;
+                  
+                  console.log('✅ Money management recalculated on data load:', {
                     availableCapital: `₹${availableCapital.toLocaleString()}`,
+                    baseTradingAmount: `₹${baseTradingAmount.toLocaleString()}`,
                     nextBuyAmount: `₹${nextBuyAmount.toLocaleString()}`,
+                    performanceMultiplier: `${performanceMultiplier.toFixed(2)}x`,
                     compoundingEffect: `${compoundingEffect.toFixed(2)}%`,
-                    successRate: `${((soldItems.filter(s => Number(s.profit || s.profitLoss || 0) > 0).length / soldItems.length) * 100).toFixed(1)}%`
+                    successRate: `${successRate.toFixed(1)}%`,
+                    totalTrades: soldItems.length
                   });
                 }
               }
@@ -3971,7 +4031,7 @@ export const ETFTradingProvider = ({ children }) => {
       const bookedProfit = state.soldItems.reduce((sum, s) => sum + (Number(s.profit ?? s.profitLoss ?? 0)), 0);
       const recomputedAvailable = Math.max(0, Number(userData.initialCapital || 0) - investedAmount + bookedProfit);
       const tradingAmount = Number(userData.tradingAmount || 0);
-      const nextBuyAmount = Math.min(recomputedAvailable, tradingAmount);
+      const nextBuyAmount = calculateNextBuyAmount(tradingAmount, recomputedAvailable, state.moneyManagement?.recentProfits || [], state.soldItems);
       
       // Calculate proper compounding effect based on trading performance
       const recentProfits = state.moneyManagement?.recentProfits || [];
