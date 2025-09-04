@@ -1,0 +1,37 @@
+# Cloudflare Workers configuration for ETF backtester
+name = "etf-backtester"
+main = "packages/worker/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Durable Objects configuration
+[[durable_objects.bindings]]
+name = "BACKTEST_DO"
+class_name = "BacktestController"
+
+# R2 bucket binding (optional)
+[[r2_buckets.bindings]]
+bucket_name = "etf-data"
+binding = "R2_BUCKET"
+
+# Environment variables
+[vars]
+DEFAULT_CHUNK_SIZE = "20000"
+DEFAULT_NUMBER_OF_CHUNKS = "50"
+MAX_CONCURRENT_BACKTESTS = "10"
+
+# Development configuration
+[env.development]
+name = "etf-backtester-dev"
+
+# Production configuration
+[env.production]
+name = "etf-backtester-prod"
+
+# Build configuration
+[build]
+command = "npm run build"
+
+# Limits
+[limits]
+cpu_ms = 50000

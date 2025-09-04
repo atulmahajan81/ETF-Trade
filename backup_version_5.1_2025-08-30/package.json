@@ -1,0 +1,72 @@
+{
+  "name": "etf-trading-app",
+  "version": "3.0.0",
+  "description": "Professional ETF Trading Application with Enhanced Data Persistence",
+  "private": true,
+  "homepage": ".",
+  "dependencies": {
+    "@testing-library/jest-dom": "^5.16.4",
+    "@testing-library/react": "^13.3.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^0.27.2",
+    "chart.js": "^4.5.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase": "^10.14.1",
+    "http-proxy-middleware": "^3.0.5",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.263.1",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.3.0",
+    "react-scripts": "5.0.1",
+    "react-window": "^1.8.7",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "dev": "npm run build && node server.js",
+    "dev:build": "npm run build",
+    "dev:server": "node server.js",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.1.6"
+  },
+  "keywords": [
+    "etf",
+    "trading",
+    "investment",
+    "portfolio",
+    "react",
+    "mstocks",
+    "data-persistence"
+  ],
+  "author": "ETF Trading Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/etf-trading-app"
+  }
+}

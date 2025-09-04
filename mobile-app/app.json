@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "ETF Trading Pro",
+    "slug": "etf-trading-mobile",
+    "version": "3.0.0",
+    "sdkVersion": "53.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a1a"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.etftrading.mobile"
+    },
+    "android": {
+      "backgroundColor": "#1a1a1a",
+      "package": "com.etftrading.mobile"
+    },
+    "scheme": "etftradingmobile",
+
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}
