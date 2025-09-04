@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ETFTradingProvider, useETFTrading } from './context/ETFTradingContext';
 import Dashboard from './pages/Dashboard';
@@ -13,16 +13,57 @@ import UserAuth from './components/UserAuth';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Profile from './pages/Profile';
+import ProxyConfig from './components/ProxyConfig';
 
 const AppContent = () => {
   const { auth, userSetup, completeUserSetup, userLogin, userSignup, userLogout } = useETFTrading();
   const [showDataImport, setShowDataImport] = useState(false);
+  // Real trading mode only
+  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
+
+  // Initialize theme on app load
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
+    setIsDarkMode(prefersDark);
+    applyTheme(prefersDark);
+
+    // Real trading mode only
+  }, []);
+
+  // Apply theme to body
+  const applyTheme = (isDark) => {
+    const body = document.body;
+    if (isDark) {
+      body.classList.add('dark-theme');
+      body.classList.remove('light-theme');
+    } else {
+      body.classList.add('light-theme');
+      body.classList.remove('dark-theme');
+    }
+  };
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    
+    // Save preference
+    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    
+    // Apply theme
+    applyTheme(newMode);
+  };
+
+  // Real trading mode only
 
   console.log('=== AppContent Debug Info ===');
   console.log('auth.isAuthenticated:', auth.isAuthenticated);
   console.log('auth.currentUser:', auth.currentUser);
   console.log('userSetup.isCompleted:', userSetup.isCompleted);
   console.log('showDataImport:', showDataImport);
+  // Real trading mode only
 
   const handleUserSetupComplete = (userData) => {
     console.log('User setup completed:', userData);
@@ -84,7 +125,12 @@ const AppContent = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {/* Top Navbar */}
-        <Navbar onLogout={userLogout} currentUser={auth.currentUser} />
+        <Navbar 
+          onLogout={userLogout} 
+          currentUser={auth.currentUser} 
+          isDarkMode={isDarkMode}
+          toggleDarkMode={toggleDarkMode}
+        />
         {/* Global Ticker removed as requested */}
         
         {/* Main Content */}
@@ -102,6 +148,9 @@ const AppContent = () => {
           </Routes>
         </main>
       </div>
+      
+      {/* Proxy Configuration Panel */}
+      <ProxyConfig />
     </div>
   );
 };

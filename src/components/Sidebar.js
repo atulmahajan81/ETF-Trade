@@ -56,11 +56,11 @@ const Sidebar = ({ currentUser }) => {
                 to={item.path}
                 className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-accent-blue text-white shadow-md'
+                    ? 'nav-active'
                     : 'text-upstox-secondary hover:bg-upstox-tertiary hover:text-upstox-primary'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-upstox-muted'}`} />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-upstox-secondary'}`} />
                 <span>{item.label}</span>
               </Link>
             );

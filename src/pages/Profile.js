@@ -37,31 +37,17 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const [sessionStatus, setSessionStatus] = useState(null);
-  const [sessionLoading, setSessionLoading] = useState(false);
   const [initialCapitalInput, setInitialCapitalInput] = useState(0);
   const [savingCapital, setSavingCapital] = useState(false);
-
-  // Load session status
-  const loadSessionStatus = useCallback(async () => {
-    console.log('🔄 loadSessionStatus called - preventing infinite loop');
-    try {
-      const status = mstocksApiService.getSessionStatus();
-      setSessionStatus(status);
-    } catch (error) {
-      console.error('Failed to load session status:', error);
-    }
-  }, []);
 
   // Check trading status on mount
   useEffect(() => {
     try {
       checkTradingEnabled();
-      loadSessionStatus();
     } catch (error) {
       console.error('Error in Profile useEffect:', error);
     }
-  }, [checkTradingEnabled, loadSessionStatus]); // Include dependencies
+  }, [checkTradingEnabled]);
 
   // Sync editable initial capital when userSetup loads/changes
   useEffect(() => {
@@ -69,62 +55,6 @@ const Profile = () => {
       setInitialCapitalInput(Number(userSetup.initialCapital) || 0);
     }
   }, [userSetup]);
-
-  // Refresh session
-  const handleRefreshSession = async () => {
-    setSessionLoading(true);
-    try {
-      // Note: MStocks API doesn't support session refresh in demo mode
-      const result = { status: 'success', message: 'Session refreshed successfully' };
-      if (result.status === 'success') {
-        await loadSessionStatus();
-        setTestResult({
-          success: true,
-          message: 'Session refreshed successfully!'
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: result.message || 'Failed to refresh session'
-        });
-      }
-    } catch (error) {
-      setTestResult({
-        success: false,
-        message: `Session refresh failed: ${error.message}`
-      });
-    } finally {
-      setSessionLoading(false);
-    }
-  };
-
-  // Clear session
-  const handleClearSession = async () => {
-    setSessionLoading(true);
-    try {
-      // Note: MStocks API doesn't support session clearing in demo mode
-      const result = { status: 'success', message: 'Session cleared successfully' };
-      if (result.status === 'success') {
-        await loadSessionStatus();
-        setTestResult({
-          success: true,
-          message: 'Session cleared successfully!'
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: result.message || 'Failed to clear session'
-        });
-      }
-    } catch (error) {
-      setTestResult({
-        success: false,
-        message: `Session clear failed: ${error.message}`
-      });
-    } finally {
-      setSessionLoading(false);
-    }
-  };
 
   // Test broker API connection
   const testBrokerConnection = async () => {
@@ -134,56 +64,9 @@ const Profile = () => {
     try {
       console.log('🧪 Testing broker API connections...');
       
-      // Test Python API first (most reliable)
-      console.log('🔍 Testing Python API server...');
-      const pythonStatus = await mstocksApiService.testConnection();
-      console.log('🐍 Python API Status:', pythonStatus);
-      
-      // Test with multiple symbols to verify functionality
-      const testSymbols = ['NIFTYBEES', 'MIDSELIETF', 'SETFNIF50'];
-      let results = [];
-      let brokerName = 'Python MStocks API';
-      let apiType = 'Python API';
-      
-      if (pythonStatus.status === 'success') {
-        console.log('🐍 Testing Python API with multiple symbols...');
-        
-        for (const symbol of testSymbols) {
-          try {
-            const result = await mstocksApiService.getLivePrice(symbol);
-            if (result && result.lastPrice && parseFloat(result.lastPrice) > 0) {
-              results.push({
-                symbol,
-                price: result.lastPrice,
-                change: result.change,
-                changePercent: result.changePercent,
-                source: result.source || 'Python MStocks API'
-              });
-            }
-          } catch (error) {
-            console.log(`🐍 Error fetching ${symbol}:`, error.message);
-          }
-        }
-        
-        if (results.length > 0) {
-          setTestResult({
-            success: true,
-            message: `✅ Successfully connected to ${brokerName}! Fetched ${results.length} live prices.`,
-            data: results[0], // Show first result in detail
-            allResults: results, // Store all results
-            brokerName,
-            apiType
-          });
-          setConnectionStatus('connected');
-          return;
-        }
-      }
-      
-      // Fallback to browser-based APIs if Python API failed
-      console.log('🔄 Python API not available, trying browser APIs...');
-      
+      // Test MStocks Browser API first (priority 1)
       if (mstocksApiService.isLoggedIn()) {
-        console.log('Testing browser MStocks API...');
+        console.log('Testing MStocks Browser API...');
         const result = await mstocksApiService.getLivePrice('NIFTYBEES');
         if (result && result.lastPrice && parseFloat(result.lastPrice) > 0) {
           setTestResult({
@@ -196,8 +79,11 @@ const Profile = () => {
           setConnectionStatus('connected');
           return;
         }
-      } else if (shoonyaApiService.isLoggedIn()) {
-        console.log('Testing Shoonya API...');
+      }
+      
+      // Test Shoonya Browser API second (priority 2)
+      if (shoonyaApiService.isLoggedIn()) {
+        console.log('Testing Shoonya Browser API...');
         const result = await shoonyaApiService.getLivePrice('NIFTYBEES');
         if (result && result.lastPrice && parseFloat(result.lastPrice) > 0) {
           setTestResult({
@@ -213,7 +99,7 @@ const Profile = () => {
       }
       
       // No working connection found
-      throw new Error('No broker is currently connected or all connections failed');
+      throw new Error('No broker is currently connected. Please login to MStocks or Shoonya.');
       
     } catch (error) {
       console.error('❌ Broker connection test failed:', error);
@@ -307,7 +193,7 @@ const Profile = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors duration-200 ${
                     activeTab === tab.id
-                      ? 'border-upstox-accent text-upstox-primary'
+                      ? 'border-upstox-accent text-upstox-primary bg-upstox-tertiary rounded-t-lg'
                       : 'border-transparent text-upstox-secondary hover:text-upstox-primary hover:border-upstox-primary'
                   }`}
                 >
@@ -435,7 +321,7 @@ const Profile = () => {
                     <span>
                       {connectionStatus === 'connected' ? 'Connected' : 
                        connectionStatus === 'failed' ? 'Connection Failed' : 
-                       'Not Connected'}
+                       'Ready to Connect'}
                     </span>
                   </div>
                   
@@ -445,11 +331,6 @@ const Profile = () => {
                       <span>Trading Enabled</span>
                     </div>
                   )}
-                  
-                  <div className="status-indicator status-warning">
-                    <Key className="w-4 h-4" />
-                    <span>Python API + Multi-Broker Support</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -460,46 +341,19 @@ const Profile = () => {
                 <h3 className="text-lg font-medium text-upstox-primary">API Connection Status</h3>
               </div>
               <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  {/* Python API Status */}
-                  <div className={`p-4 rounded-xl border ${
-                    sessionStatus?.logged_in 
-                      ? 'bg-success-50 border-success-200' 
-                      : 'bg-warning-50 border-warning-200'
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center">
-                        <div className={`w-3 h-3 rounded-full mr-2 ${
-                          sessionStatus?.logged_in ? 'bg-success-500' : 'bg-warning-500'
-                        }`}></div>
-                        <h4 className="text-sm font-medium text-neutral-900">Python API</h4>
-                      </div>
-                      <span className={`badge ${
-                        sessionStatus?.logged_in 
-                          ? 'badge-success' 
-                          : 'badge-warning'
-                      }`}>
-                        {sessionStatus?.logged_in ? 'Connected' : 'Ready'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-neutral-600">Flask server with session persistence</p>
-                    {sessionStatus?.logged_in && (
-                      <p className="text-xs text-success-600 mt-1">✓ Session active</p>
-                    )}
-                  </div>
-
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   {/* MStocks Browser API Status */}
                   <div className={`p-4 rounded-xl border ${
                     mstocksApiService.isLoggedIn()
-                      ? 'bg-success-50 border-success-200' 
-                      : 'bg-neutral-50 border-neutral-200'
+                      ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-700' 
+                      : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-600'
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
                         <div className={`w-3 h-3 rounded-full mr-2 ${
-                          mstocksApiService.isLoggedIn() ? 'bg-success-500' : 'bg-neutral-400'
+                          mstocksApiService.isLoggedIn() ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-500'
                         }`}></div>
-                        <h4 className="text-sm font-medium text-neutral-900">MStocks Browser</h4>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">MStocks Browser API</h4>
                       </div>
                       <span className={`badge ${
                         mstocksApiService.isLoggedIn()
@@ -509,21 +363,21 @@ const Profile = () => {
                         {mstocksApiService.isLoggedIn() ? 'Connected' : 'Not Connected'}
                       </span>
                     </div>
-                    <p className="text-xs text-neutral-600">Direct browser API integration</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Direct integration with session management</p>
                   </div>
 
                   {/* Shoonya Browser API Status */}
                   <div className={`p-4 rounded-xl border ${
                     shoonyaApiService.isLoggedIn()
-                      ? 'bg-success-50 border-success-200' 
-                      : 'bg-neutral-50 border-neutral-200'
+                      ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-700' 
+                      : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-600'
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
                         <div className={`w-3 h-3 rounded-full mr-2 ${
-                          shoonyaApiService.isLoggedIn() ? 'bg-success-500' : 'bg-neutral-400'
+                          shoonyaApiService.isLoggedIn() ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-500'
                         }`}></div>
-                        <h4 className="text-sm font-medium text-neutral-900">Shoonya Browser</h4>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Shoonya Browser API</h4>
                       </div>
                       <span className={`badge ${
                         shoonyaApiService.isLoggedIn()
@@ -533,16 +387,15 @@ const Profile = () => {
                         {shoonyaApiService.isLoggedIn() ? 'Connected' : 'Not Connected'}
                       </span>
                     </div>
-                    <p className="text-xs text-neutral-600">Direct browser API integration</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Alternative broker option</p>
                   </div>
                 </div>
 
-                <div className="bg-primary-50 border border-primary-200 rounded-xl p-4">
-                  <h4 className="text-sm font-medium text-primary-900 mb-2">Connection Priority</h4>
-                  <div className="text-sm text-primary-800 space-y-1">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 dark:bg-blue-900/20 dark:border-blue-700">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">Connection Priority</h4>
+                  <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
                     <p>1️⃣ <strong>MStocks Browser API</strong> - Direct integration with session management</p>
                     <p>2️⃣ <strong>Shoonya Browser API</strong> - Alternative broker option</p>
-                    <p>3️⃣ <strong>Python API</strong> - Fallback option (requires server)</p>
                   </div>
                 </div>
               </div>
@@ -558,7 +411,7 @@ const Profile = () => {
                     message: `✅ Successfully connected to MStocks! Session established and ready for real-time data fetching.`,
                     sessionData
                   });
-                  loadSessionStatus(); // Refresh session status after login
+                  // loadSessionStatus(); // Refresh session status after login
                 }}
                 onLoginError={(error) => {
                   setConnectionStatus('failed');
@@ -571,172 +424,31 @@ const Profile = () => {
               />
             </div>
 
-            {/* Session Management */}
-            <div className="card-upstox">
-              <div className="card-header">
-                <h3 className="text-lg font-medium text-upstox-primary">Session Management</h3>
-              </div>
-              <div className="p-6">
-                {sessionStatus && (
-                  <div className="space-y-4">
-                    {/* Session Status */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className={`p-4 rounded-xl ${
-                        sessionStatus.logged_in && sessionStatus.session_valid 
-                          ? 'bg-success-50 border border-success-200' 
-                          : 'bg-warning-50 border border-warning-200'
-                      }`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            {sessionStatus.logged_in && sessionStatus.session_valid ? (
-                              <CheckCircle className="w-5 h-5 text-success-600 mr-2" />
-                            ) : (
-                              <AlertCircle className="w-5 h-5 text-warning-600 mr-2" />
-                            )}
-                            <div>
-                              <h4 className="text-sm font-medium text-neutral-900">Session Status</h4>
-                              <p className={`text-sm ${
-                                sessionStatus.logged_in && sessionStatus.session_valid 
-                                  ? 'text-success-700' 
-                                  : 'text-warning-700'
-                              }`}>
-                                {sessionStatus.logged_in && sessionStatus.session_valid 
-                                  ? 'Active' 
-                                  : sessionStatus.logged_in 
-                                  ? 'Expired' 
-                                  : 'Not Logged In'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-primary-50 border border-primary-200">
-                        <div className="flex items-center">
-                          <Clock className="w-5 h-5 text-primary-600 mr-2" />
-                          <div>
-                            <h4 className="text-sm font-medium text-neutral-900">Session Duration</h4>
-                            <p className="text-sm text-primary-700">
-                              {sessionStatus.session_duration_hours || 24} hours
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Session Details */}
-                    {sessionStatus.logged_in && (
-                      <div className="bg-neutral-50 p-4 rounded-xl">
-                        <h4 className="text-sm font-medium text-neutral-900 mb-2">Session Details</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-neutral-600">Username:</span>
-                            <span className="ml-2 font-medium">{sessionStatus.username || 'N/A'}</span>
-                          </div>
-                          <div>
-                            <span className="text-neutral-600">Auto-refresh:</span>
-                            <span className={`ml-2 font-medium ${
-                              sessionStatus.auto_refresh_available ? 'text-success-600' : 'text-error-600'
-                            }`}>
-                              {sessionStatus.auto_refresh_available ? 'Available' : 'Not Available'}
-                            </span>
-                          </div>
-                          {sessionStatus.session_expires && (
-                            <div className="md:col-span-2">
-                              <span className="text-neutral-600">Expires:</span>
-                              <span className="ml-2 font-medium">
-                                {new Date(sessionStatus.session_expires).toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Session Actions */}
-                    <div className="flex flex-wrap gap-3">
-                       <button
-                        onClick={handleRefreshSession}
-                        disabled={sessionLoading || !sessionStatus.auto_refresh_available}
-                         className="btn-upstox-primary"
-                      >
-                        <RefreshCw className={`w-4 h-4 mr-2 ${sessionLoading ? 'animate-spin' : ''}`} />
-                        {sessionLoading ? 'Refreshing...' : 'Refresh Session'}
-                      </button>
-                      
-                       <button
-                        onClick={handleClearSession}
-                        disabled={sessionLoading || !sessionStatus.logged_in}
-                         className="btn-upstox-danger"
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Clear Session
-                      </button>
-                      
-                       <button
-                        onClick={loadSessionStatus}
-                        disabled={sessionLoading}
-                         className="btn-upstox-secondary"
-                      >
-                        <RefreshCw className={`w-4 h-4 mr-2 ${sessionLoading ? 'animate-spin' : ''}`} />
-                        Refresh Status
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Test Results */}
             {testResult && (
               <div className={`p-4 rounded-xl ${
-                testResult.success ? 'bg-success-50 border border-success-200' : 'bg-error-50 border border-error-200'
+                testResult.success ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700' : 'bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-700'
               }`}>
                 <div className="flex items-center">
                   {testResult.success ? (
-                    <CheckCircle className="w-5 h-5 text-success-400 mr-2" />
+                    <CheckCircle className="w-5 h-5 text-green-400 dark:text-green-300 mr-2" />
                   ) : (
-                    <XCircle className="w-5 h-5 text-error-400 mr-2" />
+                    <XCircle className="w-5 h-5 text-red-400 dark:text-red-300 mr-2" />
                   )}
                   <div>
                     <h3 className={`text-sm font-medium ${
-                      testResult.success ? 'text-success-800' : 'text-error-800'
+                      testResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
                     }`}>
                       {testResult.message}
                     </h3>
                     
                     {/* Show detailed data for single result */}
                     {testResult.data && !testResult.allResults && (
-                      <div className="mt-2 text-sm text-success-700">
+                      <div className="mt-2 text-sm text-green-700 dark:text-green-300">
                         <p><strong>Symbol:</strong> {testResult.data.symbol}</p>
                         <p><strong>Last Price:</strong> ₹{testResult.data.lastPrice}</p>
                         <p><strong>Change:</strong> ₹{testResult.data.change} ({testResult.data.changePercent}%)</p>
                         <p><strong>Source:</strong> {testResult.data.source}</p>
-                      </div>
-                    )}
-                    
-                    {/* Show multiple results for Python API test */}
-                    {testResult.allResults && testResult.allResults.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className="text-sm font-medium text-success-800 mb-2">Live Prices Fetched:</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {testResult.allResults.map((result, index) => (
-                            <div key={index} className="bg-white p-3 rounded-xl border border-success-200">
-                              <div className="text-sm font-medium text-neutral-900">{result.symbol}</div>
-                              <div className="text-lg font-bold text-success-600">₹{result.price}</div>
-                              <div className="text-xs text-neutral-600">
-                                {result.change} ({result.changePercent}%)
-                              </div>
-                              <div className="text-xs text-primary-600">{result.source}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {testResult.error && (
-                      <div className="mt-2 text-sm text-error-700">
-                        <p><strong>Error:</strong> {testResult.error}</p>
                       </div>
                     )}
                   </div>

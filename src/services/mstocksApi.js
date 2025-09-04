@@ -4,51 +4,20 @@
 
 // Removed demoDataService import
 import googleFinanceApiService from './googleFinanceApi';
-
-// API Configuration with proper local development support
-const IS_BROWSER = typeof window !== 'undefined';
-const IS_LOCAL_DEV = IS_BROWSER && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const IS_PRODUCTION = IS_BROWSER && window.location.hostname.includes('vercel.app');
-
-// For local development, use direct API to avoid CORS with remote proxy
-// For production, use the proxy
-const PROXY_HOST = IS_LOCAL_DEV 
-  ? null  // Don't use proxy for local dev
-  : 'https://etf-trading-app.vercel.app';
-
-const MSTOCKS_API_BASE_URL = IS_BROWSER
-  ? (IS_LOCAL_DEV ? 'https://api.mstock.trade/openapi/typea' : `${PROXY_HOST}/api/mstocks-typea-proxy`)
-  : 'https://api.mstock.trade/openapi/typea';
-  
-const MSTOCKS_TYPEB_API_BASE_URL = IS_BROWSER
-  ? (IS_LOCAL_DEV ? 'https://api.mstock.trade/openapi/typeb' : `${PROXY_HOST}/api/mstocks-typeb-proxy`)
-  : 'https://api.mstock.trade/openapi/typeb';
-
-// Always send order placement/cancellation directly to broker (avoid proxy/CORS issues)
-const ORDERS_BASE_URL = 'https://api.mstock.trade/openapi/typea';
-
-console.log('🔧 API Configuration:', {
-  IS_LOCAL_DEV,
-  IS_PRODUCTION,
+import {
   MSTOCKS_API_BASE_URL,
   MSTOCKS_TYPEB_API_BASE_URL,
-  ORDERS_BASE_URL
-});
+  ORDERS_BASE_URL,
+  buildProxyUrl,
+  getConfigInfo,
+  IS_LOCAL_DEV,
+  IS_PRODUCTION
+} from '../config/apiConfig';
 
-// Helper function to build proxy URLs
-const buildProxyUrl = (baseUrl, endpoint) => {
-  if (IS_LOCAL_DEV || !baseUrl.includes('proxy')) {
-    // Direct API call
-    return `${baseUrl}/${endpoint}`;
-  } else {
-    // Proxy call - pass the endpoint as a query parameter
-    const encodedPath = encodeURIComponent(endpoint);
-    return `${baseUrl}?path=${encodedPath}`;
-  }
-};
+// Log current configuration
+console.log('🔧 API Configuration:', getConfigInfo());
 
-// Demo mode flag - set to true for demo mode, false for live API calls
-const DEMO_MODE = false; // Set to false for real trading, true for testing
+// Real trading mode only - no demo/simulation data
 
 class MStocksApiService {
   constructor() {
@@ -59,14 +28,10 @@ class MStocksApiService {
     this.refreshToken = null;
     this.userCredentials = null;
     this.username = null;
-    this.demoMode = false;
     this.typebBaseUrl = MSTOCKS_TYPEB_API_BASE_URL;
     this._scriptMaster = null;
     this._scriptMasterFetchedAt = null;
     this.symbolTokenMap = {};
-    
-    // Initialize demo mode state from localStorage
-    this.initializeDemoMode();
     
     // Auto-restore session on initialization
     this.autoRestoreSession();
@@ -74,14 +39,13 @@ class MStocksApiService {
 
   // Fetch and cache Scriptmaster to resolve security tokens
   async getScriptMaster(force = false) {
-    if (this.demoMode) return null;
     if (!this.validateSession()) return null;
     const oneDayMs = 24 * 60 * 60 * 1000;
     if (!force && this._scriptMaster && this._scriptMasterFetchedAt && (Date.now() - this._scriptMasterFetchedAt.getTime()) < oneDayMs) {
       return this._scriptMaster;
     }
     try {
-      const resp = await fetch(`${MSTOCKS_API_BASE_URL}/instruments/scriptmaster`, {
+      const resp = await fetch(buildProxyUrl(MSTOCKS_API_BASE_URL, 'instruments/scriptmaster'), {
         method: 'GET',
         headers: {
           'X-Mirae-Version': '1',
@@ -162,10 +126,7 @@ class MStocksApiService {
     this.enctoken = null;
     this.refreshToken = null;
     this.username = null;
-    this.demoMode = false;
-    
-    // Clear demo mode flag from localStorage
-    localStorage.removeItem('demoMode');
+    // Clear all session data
   }
 
   // Load saved credentials from localStorage
@@ -201,59 +162,13 @@ class MStocksApiService {
 
   // Check if API is configured (alias for hasCredentials for compatibility)
   isConfigured() {
-    return this.hasCredentials() || this.demoMode;
+    return this.hasCredentials();
   }
 
-  // Enable demo mode
-  enableDemoMode() {
-    this.demoMode = true;
-    this.username = 'demo_user';
-    this.accessToken = 'demo_token_' + Date.now();
-    this.tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    this.saveSession();
-    
-    // Set demo mode flag in localStorage for persistence
-    localStorage.setItem('demoMode', 'true');
-    
-    console.log('🎮 Demo mode enabled');
-  }
-
-  // Disable demo mode
-  disableDemoMode() {
-    this.demoMode = false;
-    this.username = null;
-    this.accessToken = null;
-    this.tokenExpiry = null;
-    this.saveSession();
-    
-    // Remove demo mode flag from localStorage
-    localStorage.removeItem('demoMode');
-    
-    console.log('🔧 Demo mode disabled');
-  }
-
-  // Initialize demo mode state from localStorage
-  initializeDemoMode() {
-    const demoModeFlag = localStorage.getItem('demoMode');
-    if (demoModeFlag === 'true') {
-      this.demoMode = true;
-      this.username = 'demo_user';
-      console.log('🎮 Demo mode initialized from localStorage');
-    } else {
-      // Default to real mode if no flag or flag is false/null
-      this.demoMode = false;
-      console.log('🔧 Real mode initialized from localStorage (default)');
-    }
-  }
-
-  // Check if in demo mode
-  isDemoMode() {
-    return this.demoMode;
-  }
+  // Real trading mode only - no demo functionality
 
   // Validate session
   validateSession() {
-    if (this.demoMode) return true;
     if (!this.accessToken) return false;
     if (this.tokenExpiry && new Date() > this.tokenExpiry) return false;
     return true;
@@ -268,10 +183,9 @@ class MStocksApiService {
         enctoken: this.enctoken,
         refresh_token: this.refreshToken,
         username: this.username,
-        demo_mode: this.demoMode,
         token_expiry: this.tokenExpiry ? this.tokenExpiry.toISOString() : null,
-        // Save encrypted credentials for auto-refresh (only if not in demo mode)
-        ...(this.userCredentials && !this.demoMode && {
+        // Save encrypted credentials for auto-refresh
+        ...(this.userCredentials && {
           user_credentials: {
             username: this.userCredentials.username,
             // Note: Password is stored for auto-refresh but should be handled securely
@@ -297,11 +211,10 @@ class MStocksApiService {
         this.enctoken = sessionData.enctoken;
         this.refreshToken = sessionData.refresh_token;
         this.username = sessionData.username;
-        this.demoMode = sessionData.demo_mode || false;
         this.tokenExpiry = sessionData.token_expiry ? new Date(sessionData.token_expiry) : null;
         
         // Restore user credentials for auto-refresh
-        if (sessionData.user_credentials && !this.demoMode) {
+        if (sessionData.user_credentials) {
           this.userCredentials = {
             username: sessionData.user_credentials.username,
             password: sessionData.user_credentials.password
@@ -367,7 +280,7 @@ class MStocksApiService {
       username: this.username,
       session_expires: this.tokenExpiry ? this.tokenExpiry.toISOString() : null,
       session_valid: this.validateSession(),
-      demo_mode: this.demoMode
+      real_trading_mode: true
     };
   }
 
@@ -381,7 +294,7 @@ class MStocksApiService {
     try {
       console.log('🔄 Refreshing access token...');
       
-      const url = `${MSTOCKS_API_BASE_URL}/session/refresh`;
+      const url = buildProxyUrl(MSTOCKS_API_BASE_URL, 'session/refresh');
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -416,7 +329,6 @@ class MStocksApiService {
 
   // Auto-refresh session if needed
   async autoRefreshSession() {
-    if (this.demoMode) return true;
     
     if (!this.validateSession()) {
       console.log('🔄 Session invalid, attempting auto-refresh...');
@@ -445,79 +357,13 @@ class MStocksApiService {
     }
   }
 
-  // Update demo holdings with current prices
-  async updateDemoHoldings() {
-    if (!this.demoMode) return;
-    
-    try {
-      const existingData = localStorage.getItem('etfTradingData');
-      if (existingData) {
-        const data = JSON.parse(existingData);
-        
-        // Update each holding with current price
-        for (let holding of data.holdings) {
-          const priceData = await this.getLivePrice(holding.symbol);
-          if (priceData.status === 'success') {
-            const currentPrice = priceData.data.price;
-            holding.currentPrice = currentPrice;
-            holding.currentValue = currentPrice * holding.quantity;
-            holding.profitLoss = (currentPrice - holding.buyPrice) * holding.quantity;
-            holding.profitPercentage = ((currentPrice - holding.buyPrice) / holding.buyPrice) * 100;
-          }
-        }
-        
-        localStorage.setItem('etfTradingData', JSON.stringify(data));
-      }
-    } catch (error) {
-      console.error('Error updating demo holdings:', error);
-    }
-  }
+  // Real trading mode - no demo holdings updates
 
-  // Test connection
-  async testConnection() {
-    try {
-      if (this.demoMode) {
-        return { status: 'success', message: 'Demo mode active' };
-      }
-      
-      if (!this.validateSession()) {
-        return { status: 'error', message: 'No valid session' };
-      }
-      
-      // Test with a simple price fetch
-      const testPrice = await this.getLivePrice('NSE:NIFTYBEES');
-      if (testPrice.status === 'success') {
-        return { status: 'success', message: 'Connection successful' };
-      } else {
-        return { status: 'error', message: testPrice.message };
-      }
-    } catch (error) {
-      return { status: 'error', message: error.message };
-    }
-  }
+
 
   // Login to MStocks API using username/password - Step 2 of official flow
   async login(username, password) {
-    if (DEMO_MODE) {
-      this.demoMode = true;
-      this.username = username;
-      this.saveSession();
-      return {
-        status: 'success',
-        data: {
-          ugid: 'demo-ugid-12345',
-          is_kyc: 'true',
-          is_activate: 'true',
-          is_password_reset: 'true',
-          is_error: 'false',
-          cid: username,
-          nm: username,
-          flag: 0
-        },
-        requiresOtp: true,
-        message: 'OTP sent to your registered mobile number (Demo Mode)'
-      };
-    }
+    // Real trading mode only
 
     try {
       console.log('🔐 Step 2: Logging in to MStocks API:', { username });
@@ -526,7 +372,7 @@ class MStocksApiService {
       formData.append('username', username);
       formData.append('password', password);
 
-      const response = await fetch(`${MSTOCKS_API_BASE_URL}/connect/login`, {
+      const response = await fetch(buildProxyUrl(MSTOCKS_API_BASE_URL, 'connect/login'), {
         method: 'POST',
         headers: {
           'X-Mirae-Version': '1',
@@ -571,34 +417,7 @@ class MStocksApiService {
 
   // Generate session token using API key and request token - Step 3 of official flow
   async generateSession(apiKey, requestToken, otp = null) {
-    if (DEMO_MODE) {
-      this.demoMode = true;
-      this.accessToken = 'demo_access_token_123';
-      this.apiKey = apiKey;
-      this.enctoken = 'demo_enctoken_789';
-      this.refreshToken = 'demo_refresh_token_456';
-      this.tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-      this.saveSession();
-      return {
-        status: 'success',
-        data: {
-          user_type: 'individual',
-          email: 'demo@example.com',
-          user_name: 'Demo User',
-          user_shortname: 'NA',
-          broker: 'MIRAE',
-          exchanges: ['NSE', 'NFO', 'CDS'],
-          products: ['CNC', 'NRML', 'MIS'],
-          order_types: ['MARKET', 'LIMIT'],
-          avatar_url: '',
-          access_token: this.accessToken,
-          refresh_token: this.refreshToken,
-          enctoken: this.enctoken,
-          api_key: this.apiKey
-        },
-        message: 'Demo session generated successfully'
-      };
-    }
+    // Real trading mode only
 
     try {
       console.log('🔐 Step 3: Generating session with MStocks API');
@@ -661,7 +480,7 @@ class MStocksApiService {
       formData.append('request_token', requestToken); // This should be the OTP
       formData.append('checksum', 'L'); // Default checksum as per documentation
       
-      const response = await fetch(`${MSTOCKS_API_BASE_URL}/session/token`, {
+      const response = await fetch(buildProxyUrl(MSTOCKS_API_BASE_URL, 'session/token'), {
         method: 'POST',
         headers: {
           'X-Mirae-Version': '1',
@@ -718,31 +537,36 @@ class MStocksApiService {
     try {
       const cleanSymbol = symbol.replace('NSE:', '').replace('BSE:', '');
       
-      // Try different symbol formats as per Python API
+      // Try different symbol formats - ETFs don't need -EQ suffix
       const symbolFormats = [
-        `NSE:${cleanSymbol}-EQ`,
         `NSE:${cleanSymbol}`,
         cleanSymbol,
-        `${cleanSymbol}-EQ`
+        `${cleanSymbol}-EQ`,
+        `NSE:${cleanSymbol}-EQ`
       ];
       
       for (const symbolFormat of symbolFormats) {
         try {
-          const url = `${MSTOCKS_API_BASE_URL}/instruments/quote/ltp?i=${encodeURIComponent(symbolFormat)}&_=${Date.now()}`;
+          const url = buildProxyUrl(MSTOCKS_API_BASE_URL, `instruments/quote/ltp?i=${encodeURIComponent(symbolFormat)}&_=${Date.now()}`);
+          
+          console.log(`🔗 TypeA API URL for ${symbolFormat}:`, url);
           
           const response = await fetch(url, {
             method: 'GET',
             headers: {
               'X-Mirae-Version': '1',
               'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
+              'Content-Type': 'application/json'
             }
           });
 
           if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              console.warn(`⚠️ Non-JSON response for ${symbolFormat}: ${contentType}`);
+              continue;
+            }
+            
             const data = await response.json();
             if (data.status === 'success' && data.data) {
               // Data may be keyed by symbol or be an array/object
@@ -777,7 +601,7 @@ class MStocksApiService {
         }
       }
       
-      return { status: 'error', message: 'All symbol formats failed for Type A API' };
+      return { status: 'error', message: `All symbol formats failed for Type A API: ${symbol}` };
     } catch (error) {
       return { status: 'error', message: `Type A API error: ${error.message}` };
     }
@@ -792,24 +616,21 @@ class MStocksApiService {
     try {
       const cleanSymbol = symbol.replace('NSE:', '').replace('BSE:', '');
       const symbolFormats = [
-        `NSE:${cleanSymbol}-EQ`,
         `NSE:${cleanSymbol}`,
         cleanSymbol,
-        `${cleanSymbol}-EQ`
+        `${cleanSymbol}-EQ`,
+        `NSE:${cleanSymbol}-EQ`
       ];
 
       for (const symbolFormat of symbolFormats) {
         try {
-          const url = `${MSTOCKS_API_BASE_URL}/instruments/quote/ohlc?i=${encodeURIComponent(symbolFormat)}&_=${Date.now()}`;
+          const url = buildProxyUrl(MSTOCKS_API_BASE_URL, `instruments/quote/ohlc?i=${encodeURIComponent(symbolFormat)}&_=${Date.now()}`);
           const response = await fetch(url, {
             method: 'GET',
             headers: {
               'X-Mirae-Version': '1',
               'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
+              'Content-Type': 'application/json'
             }
           });
 
@@ -875,16 +696,16 @@ class MStocksApiService {
             }
           };
 
-          const response = await fetch(`${this.typebBaseUrl}/instruments/quote?_=${Date.now()}`, {
+          const typebUrl = `${this.typebBaseUrl}/instruments/quote?_=${Date.now()}`;
+          console.log(`🔗 TypeB API URL for ${symbolFormat}:`, typebUrl);
+          
+          const response = await fetch(typebUrl, {
             method: 'GET',
             headers: {
               'X-Mirae-Version': '1',
               'Authorization': `Bearer ${this.accessToken}`,
               'X-PrivateKey': this.apiKey,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
           });
@@ -976,239 +797,54 @@ class MStocksApiService {
     return results;
   }
 
-  // Get historical data for DMA calculation
-  async getHistoricalData(symbol, days = 30) {
-    if (this.demoMode) {
-      // Return demo historical data anchored around current LTP for variety
-      try {
-        const ltpRes = await this.getLivePrice(symbol);
-        const ltp = Number(ltpRes?.data?.price ?? ltpRes?.lastPrice ?? 100);
-        const basePrice = Number.isFinite(ltp) && ltp > 0 ? ltp : 100;
-        const data = [];
-        for (let i = days - 1; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          // small ±2.5% drift
-          const drift = (Math.random() - 0.5) * 0.05;
-          const close = Math.max(1, basePrice * (1 + drift));
-          data.push({
-            date: date.toISOString().split('T')[0],
-            close: Number(close.toFixed(2))
-          });
-        }
-        return { status: 'success', data };
-      } catch {
-        // Fallback simple series near 100
-        const data = [];
-        for (let i = days - 1; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          data.push({
-            date: date.toISOString().split('T')[0],
-            close: 100 + Math.random() * 10 - 5
-          });
-        }
-        return { status: 'success', data };
-      }
-    }
 
-    if (!this.validateSession()) {
-      return { status: 'error', message: 'Session not valid. Please login first.' };
-    }
-
-    try {
-      const cleanSymbol = symbol.replace('NSE:', '').replace('BSE:', '');
-      const symbolFormats = [
-        // Highly probable first
-        `NSE:${cleanSymbol}-EQ`,
-        `NSE:${cleanSymbol}`,
-        `${cleanSymbol}-EQ`,
-        cleanSymbol,
-        `${cleanSymbol}.NS`,
-        cleanSymbol.toUpperCase()
-      ];
-
-      // Date range like Python implementation
-      const toDate = new Date();
-      const fromDate = new Date();
-      fromDate.setDate(toDate.getDate() - Math.max(30, days));
-      const fmt = (d) => d.toISOString().slice(0, 10);
-      const from = fmt(fromDate);
-      const to = fmt(toDate);
-      const fromTime = encodeURIComponent(`${from} 09:15:00`);
-      const toTime = encodeURIComponent(`${to} 15:30:00`);
-
-      for (const sym of symbolFormats) {
-        // 0) Try token-based historical_chart (most reliable) using official intervals
-        try {
-          const token = await this.resolveSecurityToken(sym);
-          if (token) {
-            const intervals = ['day', '1day', 'daily', 'D', '1D'];
-            let tokenOk = false;
-            for (const interval of intervals) {
-              const urlTok = `${MSTOCKS_API_BASE_URL}/instruments/historical/${encodeURIComponent(token)}/${encodeURIComponent(interval)}?from=${fromTime}&to=${toTime}`;
-              const respTok = await fetch(urlTok, {
-              method: 'GET',
-              headers: {
-                'X-Mirae-Version': '1',
-                'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-                'Content-Type': 'application/x-www-form-urlencoded'
-              }
-              });
-              if (respTok.ok) {
-                const raw = await respTok.json();
-                let arr = [];
-                if (Array.isArray(raw?.data?.candles)) arr = raw.data.candles.map(c => ({ date: c[0], close: c[4] }));
-                else if (Array.isArray(raw?.candles)) arr = raw.candles.map(c => ({ date: c[0], close: c[4] }));
-                else if (Array.isArray(raw?.data)) arr = raw.data;
-                else if (Array.isArray(raw)) arr = raw;
-                if (arr.length > 0) {
-                  return { status: 'success', data: arr, meta: { endpoint: 'historical_chart', interval, formatUsed: sym, token } };
-                }
-              }
-            }
-          }
-        } catch {}
-
-        // 1) Try official POST instruments/history with body { symbol, from, to, interval: '1D' }
-        try {
-          const urlPost = `${MSTOCKS_API_BASE_URL}/instruments/history`;
-          const body = JSON.stringify({ symbol: sym, from, to, interval: '1D' });
-          const respPost = await fetch(urlPost, {
-            method: 'POST',
-            headers: {
-              'X-Mirae-Version': '1',
-              'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body
-          });
-          if (respPost.ok) {
-            const raw = await respPost.json();
-            let arr = [];
-            if (Array.isArray(raw?.data)) arr = raw.data;
-            else if (Array.isArray(raw)) arr = raw;
-            else if (raw?.candles && Array.isArray(raw.candles)) arr = raw.candles.map(c => ({ date: c[0], close: c[4] }));
-            else if (raw?.ohlc && Array.isArray(raw.ohlc)) arr = raw.ohlc.map(o => ({ date: o.date || o[0], close: o.close || o[4] }));
-            else if (raw?.data && typeof raw.data === 'object') {
-              // Some responses key by symbol
-              const firstArray = Object.values(raw.data).find(v => Array.isArray(v));
-              if (Array.isArray(firstArray)) arr = firstArray;
-            }
-            if (arr.length > 0) return { status: 'success', data: arr, meta: { endpoint: 'instruments/history', formatUsed: sym } };
-          }
-        } catch {}
-
-        // 2) Try fallback POST market/history with body { symbols: [sym], from, to }
-        try {
-          const urlMarket = `${MSTOCKS_API_BASE_URL}/market/history`;
-          const bodyMarket = JSON.stringify({ symbols: [sym], from, to });
-          const respMarket = await fetch(urlMarket, {
-            method: 'POST',
-            headers: {
-              'X-Mirae-Version': '1',
-              'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: bodyMarket
-          });
-          if (respMarket.ok) {
-            const raw = await respMarket.json();
-            let arr = [];
-            if (Array.isArray(raw?.data)) arr = raw.data;
-            else if (raw?.data && typeof raw.data === 'object') {
-              const keyed = raw.data[sym] || raw.data[cleanSymbol] || Object.values(raw.data).find(v => Array.isArray(v));
-              if (Array.isArray(keyed)) arr = keyed;
-            } else if (Array.isArray(raw)) arr = raw;
-            if (arr.length > 0) return { status: 'success', data: arr, meta: { endpoint: 'market/history', formatUsed: sym } };
-          }
-        } catch {}
-
-        // 3) Try previous GET variant as a last resort
-        try {
-          const urlGet = `${MSTOCKS_API_BASE_URL}/instruments/history?symbol=${encodeURIComponent(sym)}&days=${days}`;
-          const response = await fetch(urlGet, {
-            method: 'GET',
-            headers: {
-              'X-Mirae-Version': '1',
-              'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          if (response.ok) {
-            const raw = await response.json();
-            let arr = [];
-            if (Array.isArray(raw?.data)) arr = raw.data;
-            else if (Array.isArray(raw)) arr = raw;
-            else if (raw?.candles && Array.isArray(raw.candles)) arr = raw.candles.map(c => ({ date: c[0], close: c[4] }));
-            else if (raw?.ohlc && Array.isArray(raw.ohlc)) arr = raw.ohlc.map(o => ({ date: o.date || o[0], close: o.close || o[4] }));
-            if (arr.length > 0) return { status: 'success', data: arr, meta: { endpoint: 'instruments/history:get', formatUsed: sym, days } };
-          }
-        } catch {}
-
-        // 3.5) Try symbol-based historical endpoint
-        try {
-          const cleanSym = sym.replace('NSE:', '').replace('BSE:', '').replace('.NS', '').replace('-EQ', '');
-          const urlHistSym = `${MSTOCKS_API_BASE_URL}/historical/${encodeURIComponent(cleanSym)}?exchange=NSE&interval=1day&from=${from}&to=${to}`;
-          const respHistSym = await fetch(urlHistSym, {
-            method: 'GET',
-            headers: {
-              'X-Mirae-Version': '1',
-              'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          if (respHistSym.ok) {
-            const raw = await respHistSym.json();
-            let arr = [];
-            if (Array.isArray(raw?.data?.candles)) arr = raw.data.candles.map(c => ({ date: c[0], close: c[4] }));
-            else if (Array.isArray(raw?.candles)) arr = raw.candles.map(c => ({ date: c[0], close: c[4] }));
-            else if (Array.isArray(raw?.data)) arr = raw.data;
-            else if (Array.isArray(raw)) arr = raw;
-            if (arr.length > 0) return { status: 'success', data: arr, meta: { endpoint: 'historical:symbol', formatUsed: cleanSym } };
-          }
-        } catch {}
-      }
-
-      // 4) External fallback: try Yahoo Finance chart for last ~3 months (if broker history unavailable)
-      try {
-        const ySymbol = `${cleanSymbol}.NS`;
-        const urlY = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}?interval=1d&range=3mo`;
-        const respY = await fetch(urlY, { headers: { 'Accept': 'application/json' } });
-        if (respY.ok) {
-          const y = await respY.json();
-          const r = y?.chart?.result?.[0];
-          const closes = r?.indicators?.quote?.[0]?.close || [];
-          const timestamps = r?.timestamp || [];
-          const arr = closes
-            .map((c, idx) => ({ date: new Date(timestamps[idx] * 1000).toISOString().slice(0,10), close: Number(c) }))
-            .filter(p => Number.isFinite(p.close) && p.close > 0);
-          if (arr.length > 0) return { status: 'success', data: arr, meta: { endpoint: 'yahoo:chart', formatUsed: ySymbol } };
-        }
-      } catch {}
-
-      return { status: 'error', message: 'Invalid historical data response' };
-    } catch (error) {
-      return { status: 'error', message: `Historical data error: ${error.message}` };
-    }
-  }
 
   // Calculate DMA20; optionally align to a provided expected LTP to avoid series mismatch
   async calculateDMA20(symbol, expectedLtp = null) {
-    const historicalData = await this.getHistoricalData(symbol, 60);
-    if (historicalData.status !== 'success') {
-      return historicalData;
+    // Calculate date range for last 60 days
+    // Use the last trading day as end date since current day data might not be available yet
+    const today = new Date();
+    let endDate = new Date(today);
+    
+    // If today is Monday, go back to Friday
+    if (today.getDay() === 1) {
+      endDate.setDate(today.getDate() - 3);
+    } else if (today.getDay() === 0) {
+      // If today is Sunday, go back to Friday
+      endDate.setDate(today.getDate() - 2);
+    } else {
+      // Otherwise, use yesterday
+      endDate.setDate(today.getDate() - 1);
+    }
+    
+    const endDateStr = endDate.toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    console.log(`📅 Current date: ${today.toISOString()}`);
+    console.log(`📅 Using last trading day as end date: ${endDateStr}`);
+    console.log(`📅 Calculated start date: ${startDate}`);
+    
+    const historicalData = await this.getHistoricalData(symbol, startDate, endDateStr);
+    if (!historicalData || !Array.isArray(historicalData) || historicalData.length === 0) {
+      console.log(`⚠️ No historical data available for ${symbol}, skipping DMA20 calculation`);
+      
+      // Don't provide a fallback DMA20 - this would be misleading for trading decisions
+      return { 
+        status: 'error', 
+        message: 'No historical data available for DMA20 calculation',
+        data: null
+      };
     }
 
     try {
       // Ensure we only use numeric closes and at least 20 values
       // Normalize various possible history shapes and pick close/settlement price
-      let closes = (historicalData.data || [])
+      let closes = historicalData
         .map(item => Number(item.close ?? item.c ?? item.settlement ?? item.price ?? 0))
         .filter(v => Number.isFinite(v) && v > 0);
 
       if (closes.length < 20) {
-        return { status: 'error', message: 'Insufficient history for DMA20', meta: historicalData.meta };
+        return { status: 'error', message: 'Insufficient history for DMA20' };
       }
 
       // Adjust for scale mismatches (e.g., splits) by aligning last close to current LTP
@@ -1285,68 +921,7 @@ class MStocksApiService {
 
   // Place buy order
   async placeBuyOrder(orderData) {
-    if (this.demoMode) {
-      // Virtual buy order in demo mode - add to holdings
-      const orderId = 'DEMO_BUY_' + Date.now();
-      console.log('🎮 Demo mode: Virtual buy order', orderData);
-      
-      // Simulate order processing delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Get current price for the symbol
-      const priceData = await this.getLivePrice(orderData.symbol);
-      const buyPrice = priceData.status === 'success' ? priceData.data.price : (orderData.price || 100);
-      
-      // Create virtual holding entry
-      const virtualHolding = {
-        id: `demo_holding_${Date.now()}`,
-        symbol: orderData.symbol,
-        name: orderData.symbol.replace('NSE:', ''),
-        sector: 'ETF',
-        buyDate: new Date().toISOString().split('T')[0],
-        buyPrice: buyPrice,
-        quantity: orderData.quantity,
-        totalInvested: buyPrice * orderData.quantity,
-        currentPrice: buyPrice,
-        currentValue: buyPrice * orderData.quantity,
-        profitLoss: 0,
-        profitPercentage: 0,
-        lastBuyPrice: buyPrice,
-        lastBuyDate: new Date().toISOString().split('T')[0],
-        orderType: orderData.orderType || 'MARKET',
-        productType: 'CNC'
-      };
-      
-      // Add to demo holdings in localStorage
-      try {
-        const existingData = localStorage.getItem('etfTradingData');
-        if (existingData) {
-          const data = JSON.parse(existingData);
-          data.holdings = data.holdings || [];
-          data.holdings.push(virtualHolding);
-          localStorage.setItem('etfTradingData', JSON.stringify(data));
-        }
-      } catch (error) {
-        console.error('Error saving virtual holding:', error);
-      }
-      
-      return {
-        status: 'success',
-        data: {
-          orderId: orderId,
-          status: 'COMPLETE',
-          message: 'Virtual buy order placed successfully (Demo Mode)',
-          orderDetails: {
-            symbol: orderData.symbol,
-            quantity: orderData.quantity,
-            price: buyPrice,
-            orderType: orderData.orderType || 'MARKET',
-            timestamp: new Date().toISOString()
-          },
-          virtualHolding: virtualHolding
-        }
-      };
-    }
+    // Real trading mode only
 
     if (!this.validateSession()) {
       console.log('❌ Session validation failed, attempting auto-refresh...');
@@ -1392,8 +967,7 @@ class MStocksApiService {
             headers: {
               'X-Mirae-Version': '1',
               'Authorization': `token ${this.apiKey}:${this.accessToken}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Accept': 'application/json'
+              'Content-Type': 'application/x-www-form-urlencoded'
             },
             timeout: 30000
           });
@@ -1464,97 +1038,7 @@ class MStocksApiService {
 
   // Place sell order
   async placeSellOrder(orderData) {
-    if (this.demoMode) {
-      // Virtual sell order in demo mode - move from holdings to sold items
-      const orderId = 'DEMO_SELL_' + Date.now();
-      console.log('🎮 Demo mode: Virtual sell order', orderData);
-      
-      // Simulate order processing delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Get current price for the symbol
-      const priceData = await this.getLivePrice(orderData.symbol);
-      const sellPrice = priceData.status === 'success' ? priceData.data.price : (orderData.price || 100);
-      
-      try {
-        const existingData = localStorage.getItem('etfTradingData');
-        if (existingData) {
-          const data = JSON.parse(existingData);
-          
-          // Find the holding to sell
-          const holdingIndex = data.holdings.findIndex(h => h.symbol === orderData.symbol);
-          if (holdingIndex !== -1) {
-            const holding = data.holdings[holdingIndex];
-            const buyPrice = holding.buyPrice || 100;
-            const profit = (sellPrice - buyPrice) * orderData.quantity;
-            const profitPercent = ((sellPrice - buyPrice) / buyPrice) * 100;
-            
-            // Create sold item entry
-            const soldItem = {
-              id: `demo_sold_${Date.now()}`,
-              symbol: orderData.symbol,
-              name: holding.name,
-              quantity: orderData.quantity,
-              buyPrice: buyPrice,
-              sellPrice: sellPrice,
-              buyDate: holding.buyDate,
-              sellDate: new Date().toISOString().split('T')[0],
-              profit: profit,
-              profitPercent: profitPercent
-            };
-            
-            // Add to sold items
-            data.soldItems = data.soldItems || [];
-            data.soldItems.push(soldItem);
-            
-            // Update total profit
-            data.totalProfit = (data.totalProfit || 0) + profit;
-            
-            // Remove from holdings or reduce quantity
-            if (orderData.quantity >= holding.quantity) {
-              // Sell entire holding
-              data.holdings.splice(holdingIndex, 1);
-            } else {
-              // Partial sell - reduce quantity
-              holding.quantity -= orderData.quantity;
-              holding.totalInvested = holding.buyPrice * holding.quantity;
-              holding.currentValue = holding.currentPrice * holding.quantity;
-            }
-            
-            localStorage.setItem('etfTradingData', JSON.stringify(data));
-            
-            return {
-              status: 'success',
-              data: {
-                orderId: orderId,
-                status: 'COMPLETE',
-                message: 'Virtual sell order placed successfully (Demo Mode)',
-                orderDetails: {
-                  symbol: orderData.symbol,
-                  quantity: orderData.quantity,
-                  price: sellPrice,
-                  orderType: orderData.orderType || 'MARKET',
-                  timestamp: new Date().toISOString()
-                },
-                soldItem: soldItem,
-                profit: profit
-              }
-            };
-          } else {
-            return {
-              status: 'error',
-              message: 'No holding found for this symbol in demo mode'
-            };
-          }
-        }
-      } catch (error) {
-        console.error('Error processing virtual sell order:', error);
-        return {
-          status: 'error',
-          message: 'Error processing virtual sell order'
-        };
-      }
-    }
+    // Real trading mode only
 
     if (!this.validateSession()) {
       console.log('❌ Session validation failed, attempting auto-refresh...');
@@ -1668,26 +1152,25 @@ class MStocksApiService {
     }
   }
 
-  // Get order status
+  // Get order status - Using proxy system (working version)
   async getOrderStatus(orderId) {
-    // Demo mode returns a pending-like state to avoid false positives
-    if (this.demoMode) {
-      return {
-        status: 'PENDING',
-        data: { orderId, status: 'PENDING', message: 'Demo mode - no broker status' }
-      };
-    }
+    // Real trading mode only
 
     if (!this.validateSession()) {
       return { status: 'error', message: 'Session not valid. Please login first.' };
     }
 
     try {
+      console.log(`🔍 Checking order status for: ${orderId}`);
+      
       // Primary: Individual Order Details (GET with querystring)
       const params = new URLSearchParams();
       params.append('order_no', orderId);
       params.append('segment', 'E');
-      const urlDetailsGet = `${MSTOCKS_API_BASE_URL}/order/details?${params.toString()}`;
+      const urlDetailsGet = buildProxyUrl(MSTOCKS_API_BASE_URL, `order/details?${params.toString()}`);
+      
+      console.log(`📡 Primary endpoint: ${urlDetailsGet}`);
+      
       const respDetailsGet = await fetch(urlDetailsGet, {
         method: 'GET',
         headers: {
@@ -1697,9 +1180,26 @@ class MStocksApiService {
         }
       });
 
+      console.log(`📊 Primary response status: ${respDetailsGet.status}`);
+
       if (respDetailsGet.ok) {
-        const data = await respDetailsGet.json();
-        return data;
+        try {
+          const responseText = await respDetailsGet.text();
+          const data = JSON.parse(responseText);
+          console.log(`✅ Primary endpoint success:`, data);
+          return data;
+        } catch (jsonError) {
+          console.error(`❌ Primary endpoint JSON parse error:`, jsonError);
+          throw new Error(`Invalid JSON response: ${jsonError.message}`);
+        }
+      } else {
+        console.error(`❌ Primary endpoint failed: ${respDetailsGet.status}`);
+        try {
+          const errorText = await respDetailsGet.text();
+          console.error(`❌ Primary endpoint error response:`, errorText.substring(0, 500));
+        } catch (textError) {
+          console.error(`❌ Primary endpoint error response read failed:`, textError);
+        }
       }
 
       // Secondary: Some stacks require POST form to /order/details
@@ -1707,7 +1207,7 @@ class MStocksApiService {
         const form = new URLSearchParams();
         form.append('order_no', orderId);
         form.append('segment', 'E');
-        const respDetailsPost = await fetch(`${MSTOCKS_API_BASE_URL}/order/details`, {
+        const respDetailsPost = await fetch(buildProxyUrl(MSTOCKS_API_BASE_URL, 'order/details'), {
           method: 'POST',
           headers: {
             'X-Mirae-Version': '1',
@@ -1716,15 +1216,26 @@ class MStocksApiService {
           },
           body: form
         });
+        
         if (respDetailsPost.ok) {
-          const data = await respDetailsPost.json();
-          return data;
+          try {
+            const responseText = await respDetailsPost.text();
+            const data = JSON.parse(responseText);
+            console.log(`✅ Secondary endpoint success:`, data);
+            return data;
+          } catch (jsonError) {
+            console.error(`❌ Secondary endpoint JSON parse error:`, jsonError);
+          }
+        } else {
+          console.error(`❌ Secondary endpoint failed: ${respDetailsPost.status}`);
         }
-      } catch {}
+      } catch (error) {
+        console.error(`❌ Secondary endpoint exception:`, error);
+      }
 
       // Tertiary: Order Book and filter by order_id
       try {
-        const bookResp = await fetch(`${MSTOCKS_API_BASE_URL}/orders`, {
+        const bookResp = await fetch(buildProxyUrl(MSTOCKS_API_BASE_URL, 'orders'), {
           method: 'GET',
           headers: {
             'X-Mirae-Version': '1',
@@ -1750,7 +1261,7 @@ class MStocksApiService {
 
       // Quaternary: Tradebook (executed orders)
       try {
-        const tradesResp = await fetch(`${MSTOCKS_API_BASE_URL}/tradebook`, {
+        const tradesResp = await fetch(buildProxyUrl(MSTOCKS_API_BASE_URL, 'tradebook'), {
           method: 'GET',
           headers: {
             'X-Mirae-Version': '1',
@@ -1777,18 +1288,7 @@ class MStocksApiService {
 
   // Cancel order
   async cancelOrder(orderId) {
-    if (this.demoMode) {
-      console.log('🎮 Demo mode: Virtual order cancellation', orderId);
-      return {
-        status: 'success',
-        data: {
-          orderId: orderId,
-          status: 'CANCELLED',
-          message: 'Order cancelled successfully (Demo Mode)',
-          timestamp: new Date().toISOString()
-        }
-      };
-    }
+    // Real trading mode only
 
     if (!this.validateSession()) {
       return { status: 'error', message: 'Session not valid. Please login first.' };
@@ -1826,33 +1326,7 @@ class MStocksApiService {
 
   // Get today's orders
   async getTodaysOrders() {
-    if (this.demoMode) {
-      return {
-        status: 'success',
-        data: [
-          {
-            orderId: 'DEMO_ORDER_1',
-            symbol: 'NSE:NIFTYBEES',
-            quantity: 100,
-            price: 245.50,
-            orderType: 'MARKET',
-            side: 'BUY',
-            status: 'COMPLETE',
-            timestamp: new Date().toISOString()
-          },
-          {
-            orderId: 'DEMO_ORDER_2',
-            symbol: 'NSE:BANKBEES',
-            quantity: 50,
-            price: 456.78,
-            orderType: 'MARKET',
-            side: 'SELL',
-            status: 'COMPLETE',
-            timestamp: new Date().toISOString()
-          }
-        ]
-      };
-    }
+    // Real trading mode only
 
     if (!this.validateSession()) {
       return { status: 'error', message: 'Session not valid. Please login first.' };
@@ -1903,16 +1377,14 @@ class MStocksApiService {
 
   // Get today's trade book (executed trades)
   async getTradeBook() {
-    if (this.demoMode) {
-      return { status: 'success', data: [] };
-    }
+    // Real trading mode only
 
     if (!this.validateSession()) {
       return { status: 'error', message: 'Session not valid. Please login first.' };
     }
 
     try {
-      const url = `${MSTOCKS_API_BASE_URL}/tradebook?segment=E`;
+      const url = buildProxyUrl(MSTOCKS_API_BASE_URL, 'tradebook?segment=E');
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -1937,38 +1409,14 @@ class MStocksApiService {
 
   // Get holdings
   async getHoldings() {
-    if (this.demoMode) {
-      return {
-        status: 'success',
-        data: [
-          {
-            symbol: 'NSE:NIFTYBEES',
-            name: 'NIFTY 50 ETF',
-            quantity: 100,
-            avgPrice: 245.50,
-            currentPrice: 248.20,
-            profitLoss: 270,
-            profitPercent: 1.1
-          },
-          {
-            symbol: 'NSE:BANKBEES',
-            name: 'Bank ETF',
-            quantity: 50,
-            avgPrice: 456.78,
-            currentPrice: 462.30,
-            profitLoss: 276,
-            profitPercent: 1.2
-          }
-        ]
-      };
-    }
+    // Real trading mode only
 
     if (!this.validateSession()) {
       return { status: 'error', message: 'Session not valid. Please login first.' };
     }
 
     try {
-      const url = `${MSTOCKS_API_BASE_URL}/holdings`;
+      const url = buildProxyUrl(MSTOCKS_API_BASE_URL, 'holdings');
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -1989,54 +1437,344 @@ class MStocksApiService {
     }
   }
 
-  // Test connection
-  async testConnection() {
-    if (this.demoMode) {
-      return {
-        status: 'success',
-        message: 'Demo mode active - all features available',
-        session: {
-          logged_in: true,
-          username: 'demo_user',
-          demo_mode: true
-        }
-      };
+
+
+  // Get historical data for a symbol
+  async getHistoricalData(symbol, startDate, endDate) {
+    // Real trading mode only
+    
+    if (!this.validateSession()) {
+      throw new Error('Session not valid. Please login again.');
     }
+    
+    // Add a small delay to prevent rate limiting
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-      const testPrice = await this.getLivePrice('NSE:NIFTYBEES');
-      if (testPrice.status === 'success') {
-        return {
-          status: 'success',
-          message: 'MStocks API connection successful',
-          session: {
-            logged_in: true,
-            username: this.username,
-            demo_mode: false
-          }
-        };
+      // Get symbol token first
+      const symbolToken = await this.getSymbolToken(symbol);
+      if (!symbolToken) {
+        console.log(`Symbol token not found for ${symbol}`);
+        return [];
+      }
+
+      // Check if date range is too large (more than 1000 days)
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff > 1000) {
+        console.log(`⚠️ Date range too large (${daysDiff} days), fetching in chunks...`);
+        return await this.getHistoricalDataInChunks(symbol, startDate, endDate);
+      }
+
+      // Format dates for API - try different formats
+      const fromDateTime = `${startDate} 09:15:00`;
+      const toDateTime = `${endDate} 15:30:00`;
+      
+      // Date formatting for API
+
+      // Fetch historical data from MStocks API using the correct TypeA endpoint format
+      const url = buildProxyUrl(MSTOCKS_API_BASE_URL, `instruments/historical/NSE/${symbolToken}/day`);
+      const params = new URLSearchParams({
+        from: fromDateTime,
+        to: toDateTime
+      });
+
+      console.log(`📊 Fetching historical data for ${symbol} (Token: ${symbolToken})`);
+      console.log(`📅 Date range: ${fromDateTime} to ${toDateTime}`);
+      console.log(`🔗 Full URL: ${url}?${params}`);
+
+      const response = await fetch(`${url}?${params}`, {
+        method: 'GET',
+        headers: {
+          'X-Mirae-Version': '1',
+          'Authorization': `token ${this.apiKey}:${this.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ TypeA API Error for ${symbol}:`, response.status, errorText);
+        
+        // Try TypeB API as fallback
+        console.log(`🔄 Trying TypeB API for ${symbol}...`);
+        const typeBData = await this.getHistoricalDataTypeB(symbol, symbolToken, fromDateTime, toDateTime);
+        
+        // If TypeB also fails, return empty array (no demo data)
+        if (!typeBData || typeBData.length === 0) {
+          console.log(`⚠️ Both TypeA and TypeB failed for ${symbol}, no data available`);
+          return [];
+        }
+        
+        return typeBData;
+      }
+
+      const data = await response.json();
+      console.log(`📈 Raw API response for ${symbol}:`, data);
+      
+      if (data?.status === 'success' && data?.data?.candles) {
+        const candles = data.data.candles;
+        console.log(`✅ ${symbol}: ${candles.length} candles received`);
+        
+        return candles.map(candle => ({
+          date: candle[0].split('T')[0], // Extract date part from ISO string
+          open: parseFloat(candle[1]),
+          high: parseFloat(candle[2]),
+          low: parseFloat(candle[3]),
+          close: parseFloat(candle[4]),
+          volume: parseInt(candle[5])
+        }));
+      } else if (data?.candles) {
+        // Alternative response format
+        const candles = data.candles;
+        console.log(`✅ ${symbol}: ${candles.length} candles received (alt format)`);
+        
+        return candles.map(candle => ({
+          date: candle[0].split('T')[0], // Extract date part from ISO string
+          open: parseFloat(candle[1]),
+          high: parseFloat(candle[2]),
+          low: parseFloat(candle[3]),
+          close: parseFloat(candle[4]),
+          volume: parseInt(candle[5])
+        }));
       } else {
-        return {
-          status: 'error',
-          message: 'MStocks API connection failed',
-          session: {
-            logged_in: false,
-            username: null,
-            demo_mode: false
-          }
-        };
+        console.log(`⚠️ No valid data format for ${symbol}`);
+        return [];
+      }
+
+    } catch (error) {
+      console.error(`❌ Error fetching historical data for ${symbol}:`, error);
+      
+      // Return empty array instead of throwing error
+      console.log(`⚠️ Historical data fetch failed for ${symbol}, returning empty data`);
+      return [];
+    }
+  }
+
+  // TypeB API fallback for historical data
+  async getHistoricalDataTypeB(symbol, symbolToken, fromDateTime, toDateTime) {
+    try {
+      console.log(`📊 Trying TypeB API for ${symbol} (Token: ${symbolToken})`);
+      
+      const url = `${MSTOCKS_TYPEB_API_BASE_URL}/instruments/historical`;
+      
+      const requestData = {
+        exchange: 'NSE',
+        symboltoken: symbolToken.toString(),
+        interval: 'ONE_DAY',
+        fromdate: fromDateTime,
+        todate: toDateTime
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-Mirae-Version': '1',
+          'Authorization': `Bearer ${this.accessToken}`,
+          'X-PrivateKey': this.apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ TypeB API Error for ${symbol}:`, response.status, errorText);
+        return [];
+      }
+
+      const data = await response.json();
+      console.log(`📈 TypeB API response for ${symbol}:`, data);
+      
+      if (data?.status === 'true' && data?.data?.candles) {
+        return data.data.candles.map(candle => ({
+          date: candle[0],
+          open: parseFloat(candle[1]),
+          high: parseFloat(candle[2]),
+          low: parseFloat(candle[3]),
+          close: parseFloat(candle[4]),
+          volume: parseInt(candle[5])
+        }));
+      } else {
+        console.log(`⚠️ No valid TypeB data format for ${symbol}`);
+        return [];
       }
     } catch (error) {
-      return {
-        status: 'error',
-        message: `Connection test failed: ${error.message}`,
-        session: {
-          logged_in: false,
-          username: null,
-          demo_mode: false
-        }
-      };
+      console.error(`❌ TypeB API Error for ${symbol}:`, error);
+      
+      // Check if it's a CORS error
+      if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+        console.log(`🌐 CORS error detected for ${symbol}, no data available`);
+      }
+      
+      return [];
     }
+  }
+
+  // Get historical data in chunks to handle large date ranges
+  async getHistoricalDataInChunks(symbol, startDate, endDate) {
+    console.log(`📊 Fetching historical data in chunks for ${symbol} from ${startDate} to ${endDate}`);
+    
+    const allData = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const chunkSize = 900; // Use 900 days to stay under 1000 limit
+    
+    let currentStart = new Date(start);
+    
+    while (currentStart < end) {
+      const currentEnd = new Date(currentStart);
+      currentEnd.setDate(currentEnd.getDate() + chunkSize);
+      
+      // Don't go beyond the requested end date
+      if (currentEnd > end) {
+        currentEnd.setTime(end.getTime());
+      }
+      
+      const chunkStartStr = currentStart.toISOString().split('T')[0];
+      const chunkEndStr = currentEnd.toISOString().split('T')[0];
+      
+      console.log(`📦 Fetching chunk: ${chunkStartStr} to ${chunkEndStr}`);
+      
+      try {
+        // Use the same logic as the main getHistoricalData method
+        const symbolToken = await this.getSymbolToken(symbol);
+        if (!symbolToken) {
+          console.log(`Symbol token not found for ${symbol}`);
+          break;
+        }
+
+        const fromDateTime = `${chunkStartStr} 09:15:00`;
+        const toDateTime = `${chunkEndStr} 15:30:00`;
+        
+        const url = buildProxyUrl(MSTOCKS_API_BASE_URL, `instruments/historical/NSE/${symbolToken}/day`);
+        const params = new URLSearchParams({
+          from: fromDateTime,
+          to: toDateTime
+        });
+
+        const response = await fetch(`${url}?${params}`, {
+          method: 'GET',
+          headers: {
+            'X-Mirae-Version': '1',
+            'Authorization': `token ${this.apiKey}:${this.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data?.status === 'success' && data?.data?.candles) {
+            const candles = data.data.candles;
+            const chunkData = candles.map(candle => ({
+              date: candle[0].split('T')[0],
+              open: parseFloat(candle[1]),
+              high: parseFloat(candle[2]),
+              low: parseFloat(candle[3]),
+              close: parseFloat(candle[4]),
+              volume: parseInt(candle[5])
+            }));
+            
+            allData.push(...chunkData);
+            console.log(`✅ Chunk completed: ${chunkData.length} records`);
+          }
+        } else {
+          console.log(`⚠️ Chunk failed for ${chunkStartStr} to ${chunkEndStr}`);
+        }
+        
+        // Add delay between chunks to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+      } catch (error) {
+        console.error(`❌ Error fetching chunk for ${symbol}:`, error);
+      }
+      
+      // Move to next chunk
+      currentStart.setDate(currentStart.getDate() + chunkSize + 1);
+    }
+    
+    // Sort data by date
+    allData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    console.log(`✅ Total historical data fetched for ${symbol}: ${allData.length} records`);
+    return allData;
+  }
+
+
+  // Test API connection
+  async testConnection() {
+    try {
+      // Real trading mode only
+      
+      if (!this.validateSession()) {
+        return false;
+      }
+
+      // Try to get user profile as a connection test
+      const url = buildProxyUrl(MSTOCKS_API_BASE_URL, 'user/profile');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Mirae-Version': '1',
+          'Authorization': `token ${this.apiKey}:${this.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('API connection test failed:', error);
+      return false;
+    }
+  }
+
+  // Get symbol token for historical data
+  async getSymbolToken(symbol) {
+    // Check cache first
+    const cacheKeyVariants = [symbol, symbol.replace('NSE:', ''), symbol.replace('BSE:', ''), `${symbol}-EQ`];
+    for (const k of cacheKeyVariants) {
+      if (this.symbolTokenMap[k]) return this.symbolTokenMap[k];
+    }
+
+    const clean = symbol.replace('NSE:', '').replace('BSE:', '');
+    const variants = [clean, `${clean}-EQ`, `${clean}.NS`, clean.toUpperCase()];
+    const sm = await this.getScriptMaster();
+    if (!sm) return null;
+    const list = Array.isArray(sm) ? sm : (Array.isArray(sm?.instruments) ? sm.instruments : []);
+    if (!Array.isArray(list)) return null;
+    const pickToken = (obj) => obj.security_token || obj.token || obj.instrument_token || obj.tkn || obj.id || obj.securityToken || null;
+    const pickSymbol = (obj) => obj.trading_symbol || obj.tradingsymbol || obj.tradingSymbol || obj.symbol || obj.sym || obj.tsym || '';
+    const isNSE = (obj) => {
+      const exch = obj.exchange || obj.exch || obj.exch_seg || obj.segment || '';
+      return String(exch).toUpperCase().includes('NSE') || String(exch).toUpperCase() === 'E';
+    };
+    for (const v of variants) {
+      const match = list.find(o => isNSE(o) && String(pickSymbol(o)).toUpperCase() === String(v).toUpperCase());
+      if (match) {
+        const token = pickToken(match);
+        if (token) {
+          this.symbolTokenMap[symbol] = token;
+          this.symbolTokenMap[clean] = token;
+          return token;
+        }
+      }
+    }
+    // Looser contains match
+    for (const v of variants) {
+      const match = list.find(o => isNSE(o) && String(pickSymbol(o)).toUpperCase().startsWith(String(v).toUpperCase()));
+      if (match) {
+        const token = pickToken(match);
+        if (token) {
+          this.symbolTokenMap[symbol] = token;
+          this.symbolTokenMap[clean] = token;
+          return token;
+        }
+      }
+    }
+    return null;
   }
 }
 

@@ -4,7 +4,7 @@
 
 /* CSS Variables for consistent theming */
 :root {
-  /* Upstox Pro Dark Theme Colors */
+  /* Upstox Pro Dark Theme Colors (Default) */
   --bg-primary: #0B0F17;
   --bg-secondary: #151C2C;
   --bg-tertiary: #1E293B;
@@ -141,6 +141,78 @@
   --ticker-height: 36px;
 }
 
+/* Dark Theme Variables */
+.dark-theme {
+  /* Upstox Pro Dark Theme Colors */
+  --bg-primary: #0B0F17;
+  --bg-secondary: #151C2C;
+  --bg-tertiary: #1E293B;
+  --bg-elevated: #2D3748;
+
+  /* Text Colors */
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --text-muted: #6B7280;
+  --text-disabled: #4B5563;
+
+  /* Accent Colors */
+  --accent-blue: #2979FF;
+  --accent-blue-hover: #1E40AF;
+  --accent-blue-light: #3B82F6;
+
+  /* Trading Colors */
+  --positive-green: #00C853;
+  --positive-green-hover: #00A843;
+  --negative-red: #FF1744;
+  --negative-red-hover: #D32F2F;
+
+  /* Border Colors */
+  --border-primary: #374151;
+  --border-secondary: #4B5563;
+  --border-accent: #2979FF;
+
+  /* Status Colors */
+  --warning-yellow: #FFB300;
+  --warning-orange: #FF9800;
+  --info-cyan: #00BCD4;
+}
+
+/* Light Theme Variables */
+.light-theme {
+  /* Upstox Pro Light Theme Colors */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-tertiary: #F1F5F9;
+  --bg-elevated: #E2E8F0;
+
+  /* Text Colors - Improved contrast for light mode */
+  --text-primary: #0F172A;
+  --text-secondary: #1E293B;
+  --text-muted: #475569;
+  --text-disabled: #94A3B8;
+
+  /* Accent Colors - Enhanced for better visibility */
+  --accent-blue: #1D4ED8;
+  --accent-blue-hover: #1E40AF;
+  --accent-blue-light: #2563EB;
+
+  /* Trading Colors */
+  --positive-green: #059669;
+  --positive-green-hover: #047857;
+  --negative-red: #DC2626;
+  --negative-red-hover: #B91C1C;
+
+  /* Border Colors */
+  --border-primary: #E2E8F0;
+  --border-secondary: #CBD5E1;
+  --border-accent: #1D4ED8;
+
+  /* Status Colors */
+  --warning-yellow: #D97706;
+  --warning-orange: #EA580C;
+  --info-cyan: #0891B2;
+}
+
 /* Base Styles */
 * {
   box-sizing: border-box;
@@ -173,6 +245,533 @@ h6 { font-size: var(--font-size-base); }
 
 /* Professional Components */
 @layer components {
+  /* Upstox Theme Components */
+  .navbar-upstox {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    padding: 0.75rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  
+  .sidebar-upstox {
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-primary);
+    width: 16rem;
+    min-height: 100vh;
+  }
+  
+  .main-content-upstox {
+    background-color: var(--bg-primary);
+    flex: 1;
+    overflow: auto;
+  }
+  
+  .card-upstox {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .btn-upstox-primary {
+    background-color: var(--accent-blue);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .btn-upstox-primary:hover {
+    background-color: var(--accent-blue-hover);
+  }
+  
+  .btn-upstox-primary:focus {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+  }
+  
+  .btn-upstox-secondary {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid var(--border-primary);
+    cursor: pointer;
+  }
+  
+  .btn-upstox-secondary:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-secondary);
+    color: var(--text-primary);
+  }
+  
+  .btn-upstox-secondary:focus {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+  }
+  
+  .btn-upstox-secondary.active {
+    background-color: var(--accent-blue);
+    color: #FFFFFF;
+    border-color: var(--accent-blue);
+    box-shadow: 0 2px 4px rgba(37, 121, 255, 0.2);
+  }
+  
+  .btn-upstox-secondary.active:hover {
+    background-color: var(--accent-blue-hover);
+    color: #FFFFFF;
+  }
+  
+  .btn-upstox-success {
+    background-color: var(--positive-green);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .btn-upstox-success:hover {
+    background-color: var(--positive-green-hover);
+  }
+  
+  .btn-upstox-success:focus {
+    outline: 2px solid var(--positive-green);
+    outline-offset: 2px;
+  }
+  
+  .btn-upstox-danger {
+    background-color: var(--negative-red);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .btn-upstox-danger:hover {
+    background-color: var(--negative-red-hover);
+  }
+  
+  .btn-upstox-danger:focus {
+    outline: 2px solid var(--negative-red);
+    outline-offset: 2px;
+  }
+  
+  .btn-upstox-warning {
+    background-color: var(--warning-yellow);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .btn-upstox-warning:hover {
+    background-color: var(--warning-orange);
+  }
+  
+  .btn-upstox-warning:focus {
+    outline: 2px solid var(--warning-yellow);
+    outline-offset: 2px;
+  }
+  
+  .input-upstox {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease-in-out;
+    width: 100%;
+  }
+  
+  .input-upstox::placeholder {
+    color: var(--text-muted);
+  }
+  
+  .input-upstox:focus {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+    border-color: var(--accent-blue);
+  }
+  
+  .table-upstox {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    width: 100%;
+  }
+  
+  .table-upstox th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-primary);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  
+  .table-upstox td {
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-primary);
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  /* Additional UI Components */
+  .text-upstox-primary {
+    color: var(--text-primary);
+  }
+  
+  .text-upstox-secondary {
+    color: var(--text-secondary);
+  }
+  
+  .text-upstox-muted {
+    color: var(--text-muted);
+  }
+  
+  .bg-upstox-primary {
+    background-color: var(--bg-primary);
+  }
+  
+  .bg-upstox-secondary {
+    background-color: var(--bg-secondary);
+  }
+  
+  .bg-upstox-tertiary {
+    background-color: var(--bg-tertiary);
+  }
+  
+  .bg-upstox-elevated {
+    background-color: var(--bg-elevated);
+  }
+  
+  .bg-upstox-warning {
+    background-color: var(--warning-yellow);
+  }
+  
+  .bg-upstox-success {
+    background-color: var(--positive-green);
+  }
+  
+  .bg-upstox-danger {
+    background-color: var(--negative-red);
+  }
+  
+  .border-upstox-primary {
+    border-color: var(--border-primary);
+  }
+  
+  .border-upstox-secondary {
+    border-color: var(--border-secondary);
+  }
+  
+  .border-upstox-accent {
+    border-color: var(--accent-blue);
+  }
+  
+  /* Hover states for text */
+  .hover\:text-upstox-primary:hover {
+    color: var(--text-primary);
+  }
+  
+  .hover\:bg-upstox-tertiary:hover {
+    background-color: var(--bg-tertiary);
+  }
+  
+  .hover\:bg-upstox-elevated:hover {
+    background-color: var(--bg-elevated);
+  }
+  
+  /* Navigation Active States */
+  .nav-active {
+    background-color: var(--accent-blue) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 2px 4px rgba(37, 121, 255, 0.2) !important;
+  }
+  
+  .nav-active:hover {
+    background-color: var(--accent-blue-hover) !important;
+    color: #FFFFFF !important;
+  }
+  
+  /* Button Active States */
+  .btn-active {
+    background-color: var(--accent-blue) !important;
+    color: #FFFFFF !important;
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 2px 4px rgba(37, 121, 255, 0.2) !important;
+  }
+  
+  .btn-active:hover {
+    background-color: var(--accent-blue-hover) !important;
+    color: #FFFFFF !important;
+  }
+  
+  /* Navigation and Tab Components */
+  .nav-tab {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+  
+  .nav-tab:hover {
+    background-color: var(--bg-elevated);
+    color: var(--text-primary);
+  }
+  
+  .nav-tab.active {
+    background-color: var(--accent-blue);
+    color: #FFFFFF;
+    border-color: var(--accent-blue);
+    box-shadow: 0 2px 4px rgba(37, 121, 255, 0.2);
+  }
+  
+  .nav-tab.active:hover {
+    background-color: var(--accent-blue-hover);
+    color: #FFFFFF;
+  }
+  
+  /* Navigation Link Styles */
+  .nav-link {
+    color: var(--text-secondary);
+    transition: all 0.2s ease-in-out;
+    text-decoration: none;
+  }
+  
+  .nav-link:hover {
+    color: var(--text-primary);
+  }
+  
+  .nav-link.active {
+    color: #FFFFFF;
+    background-color: var(--accent-blue);
+    box-shadow: 0 2px 4px rgba(37, 121, 255, 0.2);
+  }
+  
+  .nav-link.active:hover {
+    color: #FFFFFF;
+    background-color: var(--accent-blue-hover);
+  }
+  
+  /* Form Elements */
+  .form-label {
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    display: block;
+  }
+  
+  .form-input {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease-in-out;
+    width: 100%;
+  }
+  
+  .form-input:focus {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+    border-color: var(--accent-blue);
+  }
+  
+  .form-input::placeholder {
+    color: var(--text-muted);
+  }
+  
+  /* Status Indicators */
+  .status-connected {
+    color: var(--positive-green);
+  }
+  
+  .status-disconnected {
+    color: var(--negative-red);
+  }
+  
+  .status-warning {
+    color: var(--warning-yellow);
+  }
+  
+  /* Card Components */
+  .card-header {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-primary);
+    font-weight: 600;
+  }
+  
+  .card-body {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 1rem;
+  }
+  
+  .card-footer {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    padding: 1rem;
+    border-top: 1px solid var(--border-primary);
+  }
+  
+  .table-upstox tbody tr:hover {
+    @apply bg-gray-700;
+  }
+  
+  .text-upstox-primary {
+    @apply text-gray-200;
+  }
+  
+  .text-upstox-secondary {
+    @apply text-gray-400;
+  }
+  
+  .text-upstox-muted {
+    @apply text-gray-500;
+  }
+  
+  .bg-upstox-primary {
+    @apply bg-gray-900;
+  }
+  
+  .bg-upstox-secondary {
+    @apply bg-gray-800;
+  }
+  
+  .bg-upstox-tertiary {
+    @apply bg-gray-700;
+  }
+  
+  .bg-upstox-elevated {
+    @apply bg-gray-600;
+  }
+  
+  .border-upstox-primary {
+    @apply border-gray-700;
+  }
+  
+  .border-upstox-secondary {
+    @apply border-gray-600;
+  }
+  
+  /* Light Theme Variants */
+  .light-theme .navbar-upstox {
+    @apply bg-white border-gray-200;
+  }
+  
+  .light-theme .sidebar-upstox {
+    @apply bg-white border-gray-200;
+  }
+  
+  .light-theme .main-content-upstox {
+    @apply bg-gray-50;
+  }
+  
+  .light-theme .card-upstox {
+    @apply bg-white border-gray-200;
+  }
+  
+  .light-theme .btn-upstox-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white;
+  }
+  
+  .light-theme .btn-upstox-secondary {
+    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-white;
+  }
+  
+  .light-theme .btn-upstox-success {
+    @apply bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-white;
+  }
+  
+  .light-theme .btn-upstox-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white;
+  }
+  
+  .light-theme .btn-upstox-warning {
+    @apply bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-white;
+  }
+  
+  .light-theme .input-upstox {
+    @apply bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white;
+  }
+  
+  .light-theme .table-upstox {
+    @apply bg-white border-gray-200;
+  }
+  
+  .light-theme .table-upstox th {
+    @apply bg-gray-50 text-gray-900 border-gray-200;
+  }
+  
+  .light-theme .table-upstox td {
+    @apply text-gray-900 border-gray-200;
+  }
+  
+  .light-theme .table-upstox tbody tr:hover {
+    @apply bg-gray-50;
+  }
+  
+  .light-theme .text-upstox-primary {
+    @apply text-gray-900;
+  }
+  
+  .light-theme .text-upstox-secondary {
+    @apply text-gray-600;
+  }
+  
+  .light-theme .text-upstox-muted {
+    @apply text-gray-500;
+  }
+  
+  .light-theme .bg-upstox-primary {
+    @apply bg-gray-50;
+  }
+  
+  .light-theme .bg-upstox-secondary {
+    @apply bg-white;
+  }
+  
+  .light-theme .bg-upstox-tertiary {
+    @apply bg-gray-100;
+  }
+  
+  .light-theme .bg-upstox-elevated {
+    @apply bg-gray-200;
+  }
+  
+  .light-theme .border-upstox-primary {
+    @apply border-gray-200;
+  }
+  
+  .light-theme .border-upstox-secondary {
+    @apply border-gray-300;
+  }
+  
   /* Card Component */
   .card {
     @apply bg-white rounded-xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-200;
@@ -431,18 +1030,7 @@ h6 { font-size: var(--font-size-base); }
   }
 }
 
-/* Dark mode support (optional) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --neutral-50: #0f172a;
-    --neutral-100: #1e293b;
-    --neutral-200: #334155;
-    --neutral-300: #475569;
-    --neutral-400: #64748b;
-    --neutral-500: #94a3b8;
-    --neutral-600: #cbd5e1;
-    --neutral-700: #e2e8f0;
-    --neutral-800: #f1f5f9;
-    --neutral-900: #f8fafc;
-  }
+/* Theme transition for smooth switching */
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
 } 

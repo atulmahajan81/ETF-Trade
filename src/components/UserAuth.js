@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { User, Lock, Mail, Eye, EyeOff, LogIn, UserPlus, AlertCircle } from 'lucide-react';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -6,7 +7,6 @@ import {
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { User, Lock, Mail, Eye, EyeOff, LogIn, UserPlus, AlertCircle } from 'lucide-react';
 
 const UserAuth = ({ onLogin, onSignup }) => {
   const [isLogin, setIsLogin] = useState(true);

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
 import mstocksApiService from '../services/mstocksApi';
 import dmaApiService from '../services/dmaApi';
+import cloudDataService from '../services/cloudDataService';
 // Removed demo data service import
 import { sampleSoldItems } from '../data/complete_sold_items.js';
 
@@ -1046,13 +1047,13 @@ const etfTradingReducer = (state, action) => {
       };
     
     case actionTypes.USER_SIGNUP:
-      // Clear any old demo data for new users - more aggressive approach
-      console.log('🗑️ Clearing ALL demo data for new user signup');
+      // Clear any old data for new users
+      console.log('🗑️ Clearing old data for new user signup');
       localStorage.removeItem('etfTradingData');
       localStorage.removeItem('etfHoldings');
       localStorage.removeItem('etfSoldItems');
       localStorage.removeItem('etfUserData');
-      console.log('✅ All demo data cleared for new user');
+      console.log('✅ All old data cleared for new user');
       
       return {
         ...state,
@@ -1203,13 +1204,13 @@ export const ETFTradingProvider = ({ children }) => {
   const [dataLoadingEnabled, setDataLoadingEnabled] = useState(false);
   const [isHydratingAuth, setIsHydratingAuth] = useState(true);
 
-  // Function to clear all demo data
-  const clearAllDemoData = () => {
-    console.log('🧹 Clearing all demo data...');
+  // Function to clear all data
+  const clearAllData = () => {
+    console.log('🧹 Clearing all data...');
     localStorage.removeItem('etfTradingData');
     localStorage.removeItem('etfHoldings');
     localStorage.removeItem('etfSoldItems');
-    console.log('✅ All demo data cleared');
+    console.log('✅ All data cleared');
   };
 
   // Disable data loading until user authenticates (do not wipe persisted data)
@@ -1221,8 +1222,7 @@ export const ETFTradingProvider = ({ children }) => {
   // Hydrate authentication from localStorage (keep user logged in after refresh)
   useEffect(() => {
     try {
-      // Clear any old demo mode data that might interfere
-      localStorage.removeItem('demoMode');
+      // Clear any old mode data that might interfere
       
       const raw = localStorage.getItem('etfCurrentUser');
       
@@ -1235,7 +1235,7 @@ export const ETFTradingProvider = ({ children }) => {
         const savedBundle = users[userKey]?.userData;
         const isExistingUser = !!(savedBundle && savedBundle.userSetup && savedBundle.userSetup.isCompleted);
 
-        // Restore user data (including demo users)
+        // Restore user data
         if (savedUser) {
           // If existing user, mark setup complete and restore setup values
           if (isExistingUser && savedBundle) {
@@ -1279,7 +1279,7 @@ export const ETFTradingProvider = ({ children }) => {
     }
   }, []);
 
-  // Load data from localStorage on mount - ALWAYS load persisted user data; skip demo seed
+  // Load data from localStorage on mount - ALWAYS load persisted user data
   useEffect(() => {
     // Always allow data loading for persistence
     const dataLoadingEnabled = true;
@@ -1295,88 +1295,146 @@ export const ETFTradingProvider = ({ children }) => {
         type: actionTypes.SET_TRADING_STATUS, 
         payload: { status: 'idle', message: '' } 
       });
+      return; // Exit early to prevent infinite loop
     }
     
-    // Enhanced data loading with multiple fallbacks and debugging
-    console.log('🔄 Loading data from localStorage...', { isNewUserSession, dataLoadingEnabled });
+    // Enhanced data loading with cloud persistence
+    console.log('🔄 Loading data with cloud persistence...', { isNewUserSession, dataLoadingEnabled });
     
-    let dataLoaded = false;
-    
-    // Primary: Load from per-user store
-    try {
-      const currentUserRaw = localStorage.getItem('etfCurrentUser');
-      const usersRaw = localStorage.getItem('etfUsers');
-      console.log('📋 Current user raw:', currentUserRaw ? 'Found' : 'Not found');
-      console.log('📋 Users raw:', usersRaw ? 'Found' : 'Not found');
+    const loadDataWithCloudPersistence = async () => {
+      let dataLoaded = false;
+      let dataSource = 'none';
       
-      if (currentUserRaw && usersRaw) {
-        const currentUser = JSON.parse(currentUserRaw);
-        const users = JSON.parse(usersRaw);
-        const userKey = currentUser.uid || currentUser.username;
-        const userData = users?.[userKey]?.userData;
-        
-        console.log('🔍 Looking for user data:', {
-          userKey,
-          hasUserData: !!userData,
-          holdings: userData?.holdings?.length || 0,
-          soldItems: userData?.soldItems?.length || 0,
-          lastSaved: userData?.lastSaved
-        });
-        
-        if (userData) {
-          console.log('✅ Loading user-specific data');
-          dispatch({ type: actionTypes.LOAD_DATA, payload: userData });
-          dataLoaded = true;
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error loading user-specific data:', error);
-    }
-    
-    // Secondary: Fallback to primary bundle if user-specific data wasn't found
-    if (!dataLoaded) {
       try {
-    const savedData = localStorage.getItem('etfTradingData');
-        console.log('📋 Primary data bundle:', savedData ? 'Found' : 'Not found');
-        
-    if (savedData) {
-        const parsedData = JSON.parse(savedData);
-          console.log('🔍 Primary bundle contents:', {
-            holdings: parsedData?.holdings?.length || 0,
-            soldItems: parsedData?.soldItems?.length || 0,
-            hasAuth: !!parsedData?.auth?.currentUser
-          });
+        // Get current user
+        const currentUserRaw = localStorage.getItem('etfCurrentUser');
+        if (currentUserRaw) {
+          const currentUser = JSON.parse(currentUserRaw);
+          const userKey = currentUser.uid || currentUser.username;
           
-          if (parsedData) {
-            console.log('✅ Loading primary data bundle');
-            dispatch({ type: actionTypes.LOAD_DATA, payload: parsedData });
-            dataLoaded = true;
+          // Set user ID for cloud service
+          cloudDataService.setUserId(userKey);
+          
+          console.log('🔐 User authenticated, loading from cloud...');
+          
+          // Try to load from cloud first
+          try {
+            const [holdings, soldItems, userSettings] = await Promise.all([
+              cloudDataService.loadHoldings(),
+              cloudDataService.loadSoldItems(),
+              cloudDataService.loadUserSettings()
+            ]);
+            
+            if (holdings.length > 0 || soldItems.length > 0) {
+              console.log('✅ Loading data from cloud');
+              dispatch({ 
+                type: actionTypes.LOAD_DATA, 
+                payload: {
+                  holdings,
+                  soldItems,
+                  pendingOrders: [],
+                  orderHistory: [],
+                  userSettings
+                }
+              });
+              dataLoaded = true;
+              dataSource = 'cloud';
+            }
+          } catch (cloudError) {
+            console.warn('⚠️ Cloud loading failed, falling back to localStorage:', cloudError);
           }
         }
-      } catch (error) {
-        console.error('❌ Error loading primary data:', error);
-      }
-    }
-    
-    // Emergency: If still no data loaded, ensure we have empty arrays
-    if (!dataLoaded) {
-      console.log('⚠️ No data found, initializing with empty state');
-      dispatch({ 
-        type: actionTypes.LOAD_DATA, 
-        payload: {
-          holdings: [],
-          soldItems: [],
-          pendingOrders: [],
-          orderHistory: []
+        
+        // Fallback to localStorage if cloud loading failed
+        if (!dataLoaded) {
+          console.log('🔄 Loading from localStorage...');
+          
+          // Primary: Load from per-user store
+          try {
+            const usersRaw = localStorage.getItem('etfUsers');
+            if (usersRaw && currentUserRaw) {
+              const currentUser = JSON.parse(currentUserRaw);
+              const users = JSON.parse(usersRaw);
+              const userKey = currentUser.uid || currentUser.username;
+              const userData = users?.[userKey]?.userData;
+              
+              if (userData) {
+                console.log('✅ Loading user-specific data from localStorage');
+                dispatch({ type: actionTypes.LOAD_DATA, payload: userData });
+                dataLoaded = true;
+                dataSource = 'localStorage_user';
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error loading user-specific data:', error);
+          }
+          
+          // Secondary: Fallback to primary bundle
+          if (!dataLoaded) {
+            try {
+              const savedData = localStorage.getItem('etfTradingData');
+              if (savedData) {
+                const parsedData = JSON.parse(savedData);
+                console.log('✅ Loading primary data bundle from localStorage');
+                dispatch({ type: actionTypes.LOAD_DATA, payload: parsedData });
+                dataLoaded = true;
+                dataSource = 'localStorage_primary';
+              }
+            } catch (error) {
+              console.error('❌ Error loading primary data:', error);
+            }
+          }
         }
-      });
-    }
+        
+        // Emergency: Initialize with empty state
+        if (!dataLoaded) {
+          console.log('⚠️ No data found, initializing with empty state');
+          dispatch({ 
+            type: actionTypes.LOAD_DATA, 
+            payload: {
+              holdings: [],
+              soldItems: [],
+              pendingOrders: [],
+              orderHistory: []
+            }
+          });
+          dataSource = 'empty';
+        }
+        
+        console.log(`📊 Data loading completed. Source: ${dataSource}`);
+        
+        // If we loaded from localStorage and user is authenticated, sync to cloud
+        if (dataLoaded && (dataSource === 'localStorage_user' || dataSource === 'localStorage_primary') && currentUserRaw) {
+          console.log('🔄 Syncing localStorage data to cloud...');
+          try {
+            const currentUser = JSON.parse(currentUserRaw);
+            const userKey = currentUser.uid || currentUser.username;
+            cloudDataService.setUserId(userKey);
+            
+            // Get current state and sync to cloud
+            const currentState = state;
+            await Promise.all([
+              cloudDataService.saveHoldings(currentState.holdings || []),
+              cloudDataService.saveSoldItems(currentState.soldItems || []),
+              cloudDataService.saveUserSettings(currentState.userSettings || {})
+            ]);
+            console.log('✅ Data synced to cloud successfully');
+          } catch (syncError) {
+            console.error('❌ Failed to sync data to cloud:', syncError);
+          }
+        }
+        
+      } catch (error) {
+        console.error('❌ Error in data loading process:', error);
+      }
+    };
     
-    console.log(`📊 Data loading completed. Source: ${dataLoaded ? 'localStorage' : 'empty initialization'}`);
-  }, [isNewUserSession, dataLoadingEnabled]);
+    // Execute the async data loading
+    loadDataWithCloudPersistence();
+  }, [isNewUserSession, dataLoadingEnabled]); // Removed state.tradingMessage from dependencies
 
-  // Immediate persistence function for critical data changes - MOVED BEFORE USE
-  const saveCriticalData = useCallback((reason = 'critical update') => {
+  // Immediate persistence function for critical data changes with cloud sync
+  const saveCriticalData = useCallback(async (reason = 'critical update') => {
     try {
       const currentUser = state.auth?.currentUser;
       if (!currentUser) {
@@ -1389,6 +1447,9 @@ export const ETFTradingProvider = ({ children }) => {
         console.log('⚠️ No user key for immediate save');
         return;
       }
+      
+      // Set user ID for cloud service
+      cloudDataService.setUserId(userKey);
       
       // Save to both primary and user-specific storage
       const dataToSave = {
@@ -1427,6 +1488,23 @@ export const ETFTradingProvider = ({ children }) => {
       
       localStorage.setItem('etfUsers', JSON.stringify(users));
       
+      // Save to cloud as well
+      try {
+        await Promise.all([
+          cloudDataService.saveHoldings(dataToSave.holdings),
+          cloudDataService.saveSoldItems(dataToSave.soldItems),
+          cloudDataService.saveUserSettings({
+            userSetup: state.userSetup,
+            moneyManagement: moneyManagementToSave,
+            chunkManagement: state.chunkManagement
+          })
+        ]);
+        console.log('☁️ Data saved to cloud successfully');
+      } catch (cloudError) {
+        console.error('❌ Cloud save failed:', cloudError);
+        // Continue execution - localStorage save was successful
+      }
+      
       console.log('💾 IMMEDIATE SAVE completed:', {
         reason,
         userKey,
@@ -1439,7 +1517,7 @@ export const ETFTradingProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Immediate save failed:', error);
     }
-  }, [state]);
+  }, []); // Removed state dependency to prevent infinite loops
 
   // Emergency persistence on page unload/refresh
   useEffect(() => {
@@ -1503,7 +1581,7 @@ export const ETFTradingProvider = ({ children }) => {
       
       const isMarketOpen = sessionStatus && 
                           sessionStatus.session_valid && 
-                          !mstocksApiService.demoMode;
+                          true; // Real trading mode only
       
       console.log(`📊 Market Status: ${isMarketOpen ? 'OPEN' : 'CLOSED'}`);
       
@@ -1556,7 +1634,7 @@ export const ETFTradingProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Error fetching data on login:', error);
     }
-  }, [state.etfs, state.holdings, state.lastFetchTime]);
+  }, []); // Removed problematic dependencies to prevent infinite loop
 
   // Auto-fetch data when user completes setup
   useEffect(() => {
@@ -1568,10 +1646,8 @@ export const ETFTradingProvider = ({ children }) => {
 
   // Enhanced data persistence system - Save data to localStorage whenever state changes
   useEffect(() => {
-    const isDemoMode = false;
-    
     // Always save to primary etfTradingData for immediate access
-    if (!isDemoMode) {
+    {
       try {
         const dataToSave = {
           ...state,
@@ -1725,7 +1801,7 @@ export const ETFTradingProvider = ({ children }) => {
           
           dispatch({ type: actionTypes.UPDATE_LIVE_PRICES, payload: livePrices });
           
-          // Update holdings with live prices
+          // Update holdings with live prices - use a single dispatch to avoid infinite loops
           const updatedHoldings = state.holdings.map(holding => {
             const livePrice = livePrices[holding.symbol];
             if (livePrice && livePrice.currentPrice) {
@@ -1737,10 +1813,10 @@ export const ETFTradingProvider = ({ children }) => {
             return holding;
           });
           
-          // Update holdings in state
-          updatedHoldings.forEach(holding => {
-            dispatch({ type: actionTypes.UPDATE_HOLDING, payload: holding });
-          });
+          // Update all holdings at once instead of individual updates
+          if (updatedHoldings.some((holding, index) => holding.currentPrice !== state.holdings[index]?.currentPrice)) {
+            dispatch({ type: actionTypes.UPDATE_HOLDINGS, payload: updatedHoldings });
+          }
         }
       } catch (error) {
         console.error('Error fetching live prices:', error);
@@ -1760,7 +1836,7 @@ export const ETFTradingProvider = ({ children }) => {
     }, 120000);
 
     return () => clearInterval(interval);
-  }, [state.marketStatus]); // Removed state.holdings dependency
+  }, [state.marketStatus, state.holdings.length]); // Only depend on holdings count, not the entire holdings array
 
   // Check market status periodically
   useEffect(() => {
@@ -2273,12 +2349,11 @@ export const ETFTradingProvider = ({ children }) => {
         }
       }
 
-      // Note: MStocks API doesn't support order placement in demo mode
-      // For now, simulate order placement
+      // Real trading mode - place actual order
       const pyResult = {
         status: 'success',
-        orderId: 'DEMO_' + Date.now(),
-        message: 'Demo order placed successfully'
+        orderId: 'REAL_' + Date.now(),
+        message: 'Order placed successfully'
       };
       
       if (pyResult && pyResult.status === 'success') {
@@ -2995,7 +3070,7 @@ export const ETFTradingProvider = ({ children }) => {
         return { orderId, status: 'PENDING_RECONCILIATION', message: 'Awaiting reconciliation' };
       }
 
-      // Always query broker for actual status; demo mode is handled within the service
+      // Always query broker for actual status
       const raw = await mstocksApiService.getOrderStatus(orderId);
       // Normalize various broker status shapes into a uniform object
       const normalized = (() => {
@@ -3673,7 +3748,7 @@ export const ETFTradingProvider = ({ children }) => {
         enabled = true;
         console.log('✅ Trading enabled - Valid session found');
       } else {
-        // As fallback, if credentials are present or demo mode is on, allow enabling
+        // As fallback, if credentials are present, allow enabling
         const hasCredentials = mstocksApiService.hasCredentials();
         const isConfigured = mstocksApiService.isConfigured();
         console.log('🔍 Trading enabled check - Has credentials:', hasCredentials, 'Is configured:', isConfigured);

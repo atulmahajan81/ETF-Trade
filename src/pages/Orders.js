@@ -193,7 +193,7 @@ const Orders = () => {
             onClick={() => setActiveTab('pending')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'pending'
-                ? 'border-upstox-accent text-upstox-primary'
+                ? 'border-upstox-accent text-upstox-primary bg-upstox-tertiary rounded-t-lg'
                 : 'border-transparent text-upstox-secondary hover:text-upstox-primary hover:border-upstox-primary'
             }`}
           >
@@ -203,7 +203,7 @@ const Orders = () => {
             onClick={() => setActiveTab('history')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'history'
-                ? 'border-upstox-accent text-upstox-primary'
+                ? 'border-upstox-accent text-upstox-primary bg-upstox-tertiary rounded-t-lg'
                 : 'border-transparent text-upstox-secondary hover:text-upstox-primary hover:border-upstox-primary'
             }`}
           >
@@ -214,7 +214,7 @@ const Orders = () => {
               onClick={() => setActiveTab('broker-holdings')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'broker-holdings'
-                  ? 'border-upstox-accent text-upstox-primary'
+                  ? 'border-upstox-accent text-upstox-primary bg-upstox-tertiary rounded-t-lg'
                   : 'border-transparent text-upstox-secondary hover:text-upstox-primary hover:border-upstox-primary'
               }`}
             >

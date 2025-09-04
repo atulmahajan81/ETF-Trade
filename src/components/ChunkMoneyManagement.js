@@ -234,6 +234,53 @@ const ChunkMoneyManagement = () => {
     setSelectedChunk(null);
   };
 
+  // Calculate simple compounding results for comparison
+  const calculateSimpleCompounding = () => {
+    if (!simulationResults) return null;
+    
+    const { initialCapital, totalTrades, actualWinRate } = simulationResults.summary;
+    const profitTarget = config.profitTarget / 100;
+    const averageLoss = config.averageLoss / 100;
+    
+    // Calculate simple compounding with same parameters
+    let simpleCapital = initialCapital;
+    let simpleTrades = 0;
+    let simpleWins = 0;
+    
+    // Use same number of trades as chunk simulation
+    for (let i = 0; i < totalTrades; i++) {
+      const isWin = Math.random() < (actualWinRate / 100);
+      simpleTrades++;
+      
+      // Calculate trade amount (total capital divided by 50)
+      const tradeAmount = simpleCapital / 50;
+      
+      if (isWin) {
+        // Add profit to total capital
+        const profit = tradeAmount * profitTarget;
+        simpleCapital += profit;
+        simpleWins++;
+      } else {
+        // Subtract loss from total capital
+        const loss = tradeAmount * averageLoss;
+        simpleCapital -= loss;
+      }
+    }
+    
+    const simpleProfit = simpleCapital - initialCapital;
+    const simpleROI = (simpleProfit / initialCapital) * 100;
+    const simpleWinRate = (simpleWins / simpleTrades) * 100;
+    
+    return {
+      initialCapital,
+      finalCapital: simpleCapital,
+      totalProfit: simpleProfit,
+      roi: simpleROI,
+      totalTrades: simpleTrades,
+      winRate: simpleWinRate
+    };
+  };
+
   // Get chunk performance metrics
   const getChunkMetrics = (chunk) => {
     if (!chunk || chunk.totalTrades === 0) return null;
@@ -549,6 +596,116 @@ const ChunkMoneyManagement = () => {
               </div>
             </div>
           </div>
+
+          {/* Comparison: Simple vs Chunk Compounding */}
+          <div className="card-upstox p-6">
+            <h3 className="text-lg font-semibold text-upstox-primary mb-6">Comparison: Simple vs Chunk Compounding</h3>
+            
+            {(() => {
+              const simpleResults = calculateSimpleCompounding();
+              if (!simpleResults) return null;
+              
+              const chunkResults = simulationResults.summary;
+              const profitDifference = chunkResults.totalProfit - simpleResults.totalProfit;
+              const roiDifference = chunkResults.roi - simpleResults.roi;
+              
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Simple Compounding */}
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">Simple Compounding</h4>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Final Capital:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          ₹{simpleResults.finalCapital.toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Total Profit:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          ₹{simpleResults.totalProfit.toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">ROI:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {simpleResults.roi.toFixed(2)}%
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Total Trades:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {simpleResults.totalTrades}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Win Rate:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {simpleResults.winRate.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Chunk Compounding */}
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">Chunk Compounding</h4>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Final Capital:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          ₹{chunkResults.finalCapital.toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Total Profit:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          ₹{chunkResults.totalProfit.toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">ROI:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {chunkResults.roi.toFixed(2)}%
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Total Trades:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {chunkResults.totalTrades}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Win Rate:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {chunkResults.actualWinRate.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+
 
           {/* Additional Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

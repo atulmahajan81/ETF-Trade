@@ -140,19 +140,19 @@ const Strategy = () => {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center p-6 bg-upstox-tertiary rounded-xl">
-                  <Target className="w-8 h-8 text-accent-blue mx-auto mb-3" />
-                  <p className="text-sm text-upstox-secondary mb-1">Target Profit</p>
-                  <p className="text-2xl font-bold text-accent-blue">{targetProfit}%</p>
+                  <Target className="w-8 h-8 text-blue-500 dark:text-blue-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Target Profit</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{targetProfit}%</p>
                 </div>
                 <div className="text-center p-6 bg-upstox-tertiary rounded-xl">
-                  <TrendingDown className="w-8 h-8 text-accent-blue mx-auto mb-3" />
-                  <p className="text-sm text-upstox-secondary mb-1">Averaging Threshold</p>
-                  <p className="text-2xl font-bold text-upstox-primary">{averagingThreshold}%</p>
+                  <TrendingDown className="w-8 h-8 text-blue-500 dark:text-blue-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Averaging Threshold</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{averagingThreshold}%</p>
                 </div>
                 <div className="text-center p-6 bg-upstox-tertiary rounded-xl">
-                  <BookOpen className="w-8 h-8 text-positive mx-auto mb-3" />
-                  <p className="text-sm text-upstox-secondary mb-1">Max ETFs per Sector</p>
-                  <p className="text-2xl font-bold text-positive">{maxETFsPerSector}</p>
+                  <BookOpen className="w-8 h-8 text-green-500 dark:text-green-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Max ETFs per Sector</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{maxETFsPerSector}</p>
                 </div>
               </div>
             </div>
@@ -169,17 +169,17 @@ const Strategy = () => {
                   const Icon = step.icon;
                   return (
                     <div key={step.step} className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 w-10 h-10 bg-upstox-tertiary rounded-full flex items-center justify-center">
-                        <span className="text-sm font-semibold text-upstox-secondary">{step.step}</span>
+                      <div className="flex-shrink-0 w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{step.step}</span>
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-3">
-                          <Icon className="w-5 h-5 text-upstox-secondary" />
-                          <h3 className="text-lg font-semibold text-upstox-primary">{step.title}</h3>
+                          <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{step.title}</h3>
                         </div>
-                        <p className="text-upstox-secondary mb-3">{step.description}</p>
+                        <p className="text-gray-600 dark:text-gray-300 mb-3">{step.description}</p>
                         {step.details && (
-                          <p className="text-sm text-upstox-secondary bg-upstox-tertiary p-4 rounded-lg border border-upstox-primary">{step.details}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600">{step.details}</p>
                         )}
                       </div>
                     </div>
@@ -200,17 +200,17 @@ const Strategy = () => {
                   const Icon = rule.icon;
                   return (
                     <div key={rule.rule} className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 w-10 h-10 bg-upstox-tertiary rounded-full flex items-center justify-center">
-                        <span className="text-sm font-semibold text-upstox-secondary">{rule.rule}</span>
+                      <div className="flex-shrink-0 w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{rule.rule}</span>
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-3">
-                          <Icon className="w-5 h-5 text-upstox-secondary" />
-                          <h3 className="text-lg font-semibold text-upstox-primary">{rule.title}</h3>
+                          <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rule.title}</h3>
                         </div>
-                        <p className="text-upstox-secondary mb-3">{rule.description}</p>
+                        <p className="text-gray-600 dark:text-gray-300 mb-3">{rule.description}</p>
                         {rule.details && (
-                          <p className="text-sm text-upstox-secondary bg-upstox-tertiary p-4 rounded-lg border border-upstox-primary">{rule.details}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600">{rule.details}</p>
                         )}
                       </div>
                     </div>
@@ -230,14 +230,14 @@ const Strategy = () => {
                 const Icon = rule.icon;
                 return (
                   <div key={index} className="flex items-start space-x-4">
-                    <div className="flex-shrink-0 w-10 h-10 bg-upstox-tertiary rounded-full flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-upstox-secondary" />
+                    <div className="flex-shrink-0 w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-upstox-primary mb-3">{rule.title}</h3>
-                      <p className="text-upstox-secondary mb-3">{rule.description}</p>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">{rule.title}</h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-3">{rule.description}</p>
                       {rule.details && (
-                        <p className="text-sm text-upstox-secondary bg-upstox-tertiary p-4 rounded-lg border border-upstox-primary">{rule.details}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600">{rule.details}</p>
                       )}
                     </div>
                   </div>
@@ -255,12 +255,12 @@ const Strategy = () => {
               <div className="space-y-6">
                 {features.map((feature, index) => (
                   <div key={index}>
-                    <h3 className="text-lg font-semibold text-upstox-primary mb-4">{feature.title}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{feature.title}</h3>
                     <ul className="space-y-3">
                       {feature.features.map((item, itemIndex) => (
                         <li key={itemIndex} className="flex items-start space-x-3">
-                          <CheckCircle className="w-5 h-5 text-positive mt-0.5 flex-shrink-0" />
-                          <span className="text-upstox-secondary">{item}</span>
+                          <CheckCircle className="w-5 h-5 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                          <span className="text-gray-600 dark:text-gray-300">{item}</span>
                         </li>
                       ))}
                     </ul>
@@ -273,10 +273,10 @@ const Strategy = () => {
           {/* Tips */}
           <div className="card-upstox p-6">
             <div className="flex items-center gap-3 mb-4">
-              <Lightbulb className="w-6 h-6 text-accent-blue" />
-              <h3 className="text-lg font-semibold text-upstox-primary">Pro Tips</h3>
+              <Lightbulb className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pro Tips</h3>
             </div>
-            <ul className="space-y-2 text-upstox-secondary">
+            <ul className="space-y-2 text-gray-600 dark:text-gray-300">
               <li>• Always check the ETF ranking before making any purchase decision</li>
               <li>• Stick to the 6% profit target for selling (LIFO method)</li>
               <li>• Use averaging only when ETFs fall more than 2.5% from last purchase</li>

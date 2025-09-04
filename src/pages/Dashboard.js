@@ -17,7 +17,6 @@ import {
 import { Link } from 'react-router-dom';
 import mstocksApiService from '../services/mstocksApi';
 import TradingModal from '../components/TradingModal';
-import ProfessionalHeader from '../components/ProfessionalHeader';
 import PortfolioOverview from '../components/PortfolioOverview';
 import TradingActions from '../components/TradingActions';
 
@@ -538,18 +537,8 @@ const Dashboard = () => {
   };
 
           return (
-    <div className="min-h-screen bg-upstox-primary text-upstox-primary">
-      {/* Professional Header */}
-      <ProfessionalHeader
-        userSetup={userSetup}
-        moneyManagement={moneyManagement}
-        userLogout={userLogout}
-        isDemoMode={isDemoMode}
-        onEnableDemo={enableDemoMode}
-        onDisableDemo={disableDemoMode}
-      />
-
-      {/* Main Content */}
+    <div className="main-content-upstox">
+      {/* Main Content - Using main-content-upstox class for proper spacing */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <StatusBanner />
 

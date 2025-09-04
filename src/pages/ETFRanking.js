@@ -82,7 +82,8 @@ const ETFRanking = () => {
       .map(etf => {
         const cmp = Number(etf.cmp ?? etf.currentPrice ?? 0);
         const dma = Number(etf.dma20 ?? 0);
-        const percentDiff = dma > 0 && cmp > 0 ? ((cmp - dma) / dma) * 100 : 0;
+        // Only calculate percentage difference if we have valid DMA20 data
+        const percentDiff = dma > 0 && cmp > 0 ? ((cmp - dma) / dma) * 100 : null;
         const isHolding = holdings.some(h => h.symbol === etf.symbol);
         return {
           ...etf,
@@ -98,6 +99,10 @@ const ETFRanking = () => {
         if (a.isHolding && !b.isHolding) return 1;
         if (!a.isHolding && b.isHolding) return -1;
         // Then sort by percentage difference (most fallen first)
+        // Handle null values - put them at the end
+        if (a.percentDiff === null && b.percentDiff === null) return 0;
+        if (a.percentDiff === null) return 1;
+        if (b.percentDiff === null) return -1;
         return a.percentDiff - b.percentDiff;
       })
       .map((etf, index) => ({
@@ -530,10 +535,18 @@ const ETFRanking = () => {
                         )}
                       </div>
                     </td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">₹{Number(etf.dma20 ?? 0).toFixed(2)}</td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">
+                       {etf.dma20 && etf.dma20 > 0 ? `₹${Number(etf.dma20).toFixed(2)}` : 'N/A'}
+                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
-                      <TrendingDown className="inline w-4 h-4 mr-1" />
-                      {Math.abs(etf.percentDiff).toFixed(2)}%
+                      {etf.percentDiff !== null ? (
+                        <>
+                          <TrendingDown className="inline w-4 h-4 mr-1" />
+                          {Math.abs(etf.percentDiff).toFixed(2)}%
+                        </>
+                      ) : (
+                        'N/A'
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-upstox-primary">{etf.volume.toLocaleString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
