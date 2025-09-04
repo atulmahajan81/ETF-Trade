@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "REACT_APP_FIREBASE_API_KEY": "AIzaSyAxTxdrtPcvd2771oLSo76jluUGrJTh4jQ",
+    "REACT_APP_FIREBASE_AUTH_DOMAIN": "eft-trade.firebaseapp.com",
+    "REACT_APP_FIREBASE_PROJECT_ID": "eft-trade",
+    "REACT_APP_FIREBASE_STORAGE_BUCKET": "eft-trade.firebasestorage.app",
+    "REACT_APP_FIREBASE_MESSAGING_SENDER_ID": "950459287167",
+    "REACT_APP_FIREBASE_APP_ID": "1:950459287167:web:2b0e0161b306e3068c214a",
+    "REACT_APP_FIREBASE_MEASUREMENT_ID": "G-WF9M2HMBJM"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ]
+}
