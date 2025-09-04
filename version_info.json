@@ -1,0 +1,47 @@
+{
+  "version": "5.1",
+  "releaseDate": "2025-09-04",
+  "status": "production",
+  "majorFeatures": [
+    "Simplified User Authentication",
+    "Intelligent Money Management",
+    "Cloud Data Persistence",
+    "Enhanced Backtesting System",
+    "API & Data Management Improvements"
+  ],
+  "keyImprovements": [
+    "Removed complex setup windows",
+    "Smart next buy amount calculation based on trading performance",
+    "Firebase Firestore integration for cross-device sync",
+    "Real market data only - no demo data",
+    "Chunked data fetching for large date ranges",
+    "Performance-based compounding effect (0-50% range)",
+    "Automatic defaults for new users",
+    "Direct dashboard access after authentication"
+  ],
+  "technicalSpecs": {
+    "defaultInitialCapital": 600000,
+    "defaultTradingAmount": 12000,
+    "profitTarget": 6,
+    "averagingThreshold": 3,
+    "maxTradesPerMonth": 4,
+    "performanceMultipliers": {
+      "excellent": 1.5,
+      "high": 1.25,
+      "good": 1.1,
+      "average": 1.0,
+      "belowAverage": 0.9,
+      "poor": 0.75
+    }
+  },
+  "deployment": {
+    "platform": "Vercel",
+    "cloudStorage": "Firebase Firestore",
+    "apiProvider": "MStocks",
+    "automaticDeployment": true,
+    "sslEnabled": true
+  },
+  "backupLocation": "backup_version_5.1_2025-09-04",
+  "gitCommit": "4d6bd75",
+  "previousVersion": "5.0"
+}
