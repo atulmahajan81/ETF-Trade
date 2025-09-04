@@ -9,21 +9,40 @@ import { sampleSoldItems } from '../data/complete_sold_items.js';
 const IS_LOCAL_DEV = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 // Helper function to calculate compounding effect based on trading performance
-const calculateCompoundingEffect = (nextBuyAmount, baseTradingAmount, recentProfits = []) => {
+const calculateCompoundingEffect = (nextBuyAmount, baseTradingAmount, recentProfits = [], soldItems = []) => {
   if (!baseTradingAmount || baseTradingAmount <= 0) return 0;
   
-  // Calculate compounding effect based on recent trading performance
+  // Calculate overall trading performance
+  const totalTrades = soldItems.length;
+  const profitableTrades = soldItems.filter(s => Number(s.profit || s.profitLoss || 0) > 0).length;
+  const successRate = totalTrades > 0 ? (profitableTrades / totalTrades) * 100 : 0;
+  
+  // Calculate recent performance (last 5 trades)
   const recentProfitSum = recentProfits.slice(0, 5).reduce((sum, p) => sum + (p.amount || 0), 0);
   const averageRecentProfit = recentProfits.length > 0 ? recentProfitSum / Math.min(recentProfits.length, 5) : 0;
   
-  // Enhanced trading amount based on recent performance
-  const performanceMultiplier = averageRecentProfit > 0 ? Math.min(1 + (averageRecentProfit / baseTradingAmount), 1.5) : 1;
-  const enhancedTradingAmount = baseTradingAmount * performanceMultiplier;
+  // Base compounding effect on success rate and recent performance
+  let compoundingEffect = 0;
   
-  const effect = ((enhancedTradingAmount - baseTradingAmount) / baseTradingAmount) * 100;
+  if (successRate >= 80) {
+    // High success rate (80%+) - show positive compounding
+    compoundingEffect = Math.min(successRate - 70, 30); // 10-30% range
+  } else if (successRate >= 60) {
+    // Good success rate (60-79%) - show moderate compounding
+    compoundingEffect = Math.min(successRate - 60, 15); // 0-15% range
+  } else if (successRate >= 40) {
+    // Average success rate (40-59%) - show minimal compounding
+    compoundingEffect = Math.min(successRate - 40, 5); // 0-5% range
+  }
   
-  // Cap the compounding effect at a reasonable maximum (100%)
-  return Math.min(Math.max(effect, 0), 100);
+  // Adjust based on recent performance
+  if (averageRecentProfit > 0 && recentProfits.length > 0) {
+    const recentPerformanceBonus = Math.min(averageRecentProfit / baseTradingAmount * 10, 10);
+    compoundingEffect += recentPerformanceBonus;
+  }
+  
+  // Cap the compounding effect at a reasonable maximum (50%)
+  return Math.min(Math.max(compoundingEffect, 0), 50);
 };
 
 // Sample ETF data - Updated with specific ETFs for ranking (no duplicates)
@@ -434,7 +453,7 @@ const etfTradingReducer = (state, action) => {
           ...state.moneyManagement,
           availableCapital: newAvailableCapital,
           nextBuyAmount: newNextBuyAmount,
-          compoundingEffect: calculateCompoundingEffect(newNextBuyAmount, baseChunk, updatedRecent),
+          compoundingEffect: calculateCompoundingEffect(newNextBuyAmount, baseChunk, updatedRecent, state.soldItems),
           recentProfits: updatedRecent
         };
       }
@@ -1431,6 +1450,59 @@ export const ETFTradingProvider = ({ children }) => {
           } catch (syncError) {
             console.error('❌ Failed to sync data to cloud:', syncError);
           }
+        }
+        
+        // Recalculate compounding effect after data is loaded
+        if (dataLoaded && dataSource !== 'empty') {
+          setTimeout(() => {
+            try {
+              const currentUserRaw = localStorage.getItem('etfCurrentUser');
+              if (currentUserRaw) {
+                const currentUser = JSON.parse(currentUserRaw);
+                const userKey = currentUser.uid || currentUser.username;
+                const users = JSON.parse(localStorage.getItem('etfUsers') || '{}');
+                const userData = users?.[userKey]?.userData;
+                
+                if (userData?.userSetup?.isCompleted) {
+                  const initialCapital = Number(userData.userSetup.initialCapital || 0);
+                  const tradingAmount = Number(userData.userSetup.tradingAmount || 0);
+                  const holdings = userData.holdings || [];
+                  const soldItems = userData.soldItems || [];
+                  
+                  // Calculate current values
+                  const investedAmount = holdings.reduce((sum, h) => sum + ((h.avgPrice || h.buyPrice || 0) * (h.quantity || 0)), 0);
+                  const bookedProfit = soldItems.reduce((sum, s) => sum + (Number(s.profit ?? s.profitLoss ?? 0)), 0);
+                  const availableCapital = Math.max(0, initialCapital - investedAmount + bookedProfit);
+                  const nextBuyAmount = Math.min(availableCapital, tradingAmount);
+                  
+                  // Calculate compounding effect based on trading performance
+                  const recentProfits = userData.moneyManagement?.recentProfits || [];
+                  const compoundingEffect = calculateCompoundingEffect(nextBuyAmount, tradingAmount, recentProfits, soldItems);
+                  
+                  // Update money management with correct values
+                  const updatedMoneyManagement = {
+                    availableCapital: availableCapital,
+                    nextBuyAmount: nextBuyAmount,
+                    compoundingEffect: compoundingEffect,
+                    recentProfits: recentProfits
+                  };
+                  
+                  dispatch({ 
+                    type: actionTypes.UPDATE_MONEY_MANAGEMENT, 
+                    payload: updatedMoneyManagement 
+                  });
+                  
+                  console.log('✅ Compounding effect recalculated on data load:', {
+                    availableCapital: `₹${availableCapital.toLocaleString()}`,
+                    nextBuyAmount: `₹${nextBuyAmount.toLocaleString()}`,
+                    compoundingEffect: `${compoundingEffect.toFixed(2)}%`
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('❌ Error recalculating compounding effect:', error);
+            }
+          }, 1000); // Small delay to ensure state is updated
         }
         
       } catch (error) {
@@ -3897,7 +3969,22 @@ export const ETFTradingProvider = ({ children }) => {
       const investedAmount = state.holdings.reduce((sum, h) => sum + ((h.avgPrice || h.buyPrice || 0) * (h.quantity || 0)), 0);
       const bookedProfit = state.soldItems.reduce((sum, s) => sum + (Number(s.profit ?? s.profitLoss ?? 0)), 0);
       const recomputedAvailable = Math.max(0, Number(userData.initialCapital || 0) - investedAmount + bookedProfit);
-      dispatch({ type: actionTypes.UPDATE_MONEY_MANAGEMENT, payload: { ...state.moneyManagement, availableCapital: recomputedAvailable, nextBuyAmount: Math.min(recomputedAvailable, Number(userData.tradingAmount || 0)) } });
+      const tradingAmount = Number(userData.tradingAmount || 0);
+      const nextBuyAmount = Math.min(recomputedAvailable, tradingAmount);
+      
+      // Calculate proper compounding effect based on trading performance
+      const recentProfits = state.moneyManagement?.recentProfits || [];
+      const compoundingEffect = calculateCompoundingEffect(nextBuyAmount, tradingAmount, recentProfits, state.soldItems);
+      
+      dispatch({ 
+        type: actionTypes.UPDATE_MONEY_MANAGEMENT, 
+        payload: { 
+          ...state.moneyManagement, 
+          availableCapital: recomputedAvailable, 
+          nextBuyAmount: nextBuyAmount,
+          compoundingEffect: compoundingEffect
+        } 
+      });
     } catch (e) {
       console.warn('Failed to recompute available capital on setup:', e?.message);
     }
