@@ -8,7 +8,6 @@ import ETFRanking from './pages/ETFRanking';
 import Strategy from './pages/Strategy';
 import MoneyManagement from './components/MoneyManagement';
 import DataImport from './components/DataImport';
-import UserSetup from './components/UserSetup';
 import UserAuth from './components/UserAuth';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -68,15 +67,8 @@ const AppContent = () => {
   const handleUserSetupComplete = (userData) => {
     console.log('User setup completed:', userData);
     completeUserSetup(userData);
-    
-    // Show data import ONLY for new users with ETF experience
-    if (userData.hasETFTradingExperience && !auth.currentUser?.isExistingUser) {
-      console.log('📁 New user with ETF experience - showing data import');
-      setShowDataImport(true);
-    } else {
-      console.log('🏠 User setup complete - going to dashboard');
-      setShowDataImport(false);
-    }
+    console.log('🏠 User setup complete - going to dashboard');
+    setShowDataImport(false);
   };
 
   const handleDataImportComplete = () => {
@@ -90,6 +82,8 @@ const AppContent = () => {
 
   const handleSignup = async (userData) => {
     await userSignup(userData);
+    // Automatically complete user setup for new users
+    handleUserSetupComplete(userData);
   };
 
   // Always show login/signup if not authenticated
@@ -104,17 +98,9 @@ const AppContent = () => {
   console.log('Is existing user (state):', isExistingUser);
   console.log('User setup completed:', userSetup.isCompleted);
   
-  // If authenticated but user setup not completed AND not an existing user, show user setup
-  if (!userSetup.isCompleted && !isExistingUser) {
-    console.log('🆕 Showing UserSetup component for new user');
-    return <UserSetup onComplete={handleUserSetupComplete} />;
-  }
+  // Skip user setup - go directly to dashboard after authentication
 
-  // Show data import ONLY for new users with ETF experience (not existing users)
-  if (showDataImport && !isExistingUser) {
-    console.log('📁 Showing DataImport component for new user with ETF experience');
-    return <DataImport onImportComplete={handleDataImportComplete} />;
-  }
+  // Skip data import - go directly to dashboard
 
   console.log('🏠 Showing main app - user is authenticated and setup is complete');
   return (
