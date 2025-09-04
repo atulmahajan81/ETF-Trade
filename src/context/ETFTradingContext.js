@@ -1495,7 +1495,8 @@ export const ETFTradingProvider = ({ children }) => {
                   console.log('✅ Compounding effect recalculated on data load:', {
                     availableCapital: `₹${availableCapital.toLocaleString()}`,
                     nextBuyAmount: `₹${nextBuyAmount.toLocaleString()}`,
-                    compoundingEffect: `${compoundingEffect.toFixed(2)}%`
+                    compoundingEffect: `${compoundingEffect.toFixed(2)}%`,
+                    successRate: `${((soldItems.filter(s => Number(s.profit || s.profitLoss || 0) > 0).length / soldItems.length) * 100).toFixed(1)}%`
                   });
                 }
               }
